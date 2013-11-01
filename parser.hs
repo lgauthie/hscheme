@@ -115,7 +115,10 @@ parseBin = do
     return $ (Number . readBin) s
 
 parseNumber :: Parser LispVal
-parseNumber = parseBin <|> parseOct <|> parseHex <|> parseDec
+parseNumber = parseBin
+          <|> parseOct
+          <|> parseHex
+          <|> parseDec
 
 parseFloat :: Parser LispVal
 parseFloat = do

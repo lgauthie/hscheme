@@ -65,7 +65,7 @@ parseString = do
 
 parseChar :: Parser LispVal
 parseChar = do
-    string "#\\"
+    char '\\'
     chars <- (try . caseInsensitiveString) "space"
          <|> (try . caseInsensitiveString) "newline"
          <|> count 1 anyChar
@@ -83,34 +83,34 @@ parseAtom = do
 
 parseBool :: Parser LispVal
 parseBool = do
-    b <- (try . string) "#t" <|> (try . string) "#f"
+    b <- char 't' <|> char 'f'
     return $ case b of
-        "#t" -> Bool True
-        "#f" -> Bool False
+        't' -> Bool True
+        'f' -> Bool False
 
 parseHex :: Parser LispVal
 parseHex = do
-    (try . string) "#x"
+    char 'x'
     s <- many1 $ hexDigit
     let [(n, "")] = readHex s
     return $ Number n
 
 parseDec :: Parser LispVal
 parseDec = do
-    optional $ (try . string) "#d"
+    optional $ char 'd'
     s <- many1 $ digit
     return $ (Number . read) s
 
 parseOct :: Parser LispVal
 parseOct = do
-    (try . string) "#o"
+    char 'o'
     s <- many1 $ octDigit
     let [(n, "")] = readOct s
     return $ Number n
 
 parseBin :: Parser LispVal
 parseBin = do
-    (try . string) "#b"
+    char 'b'
     s <- many1 $ oneOf "10"
     return $ (Number . readBin) s
 
@@ -147,12 +147,11 @@ parseRational = do
 parseExpr :: Parser LispVal
 parseExpr = parseAtom
     <|> try parseString
-    <|> try parseChar
     <|> try parseRational
     <|> try parseComplex
     <|> try parseFloat
-    <|> try parseNumber
-    <|> try parseBool
+    <|> do char '#'
+           parseNumber <|> parseChar <|> parseBool
     <|> do char '('
            x <- try parseList <|> parseDottedList
            char ')'

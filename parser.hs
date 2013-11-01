@@ -149,7 +149,7 @@ parseRational = do
 
 parseExpr :: Parser LispVal
 parseExpr = parseAtom
-    <|> try parseString
+    <|> parseString
     <|> try parseRational
     <|> try parseComplex
     <|> try parseFloat

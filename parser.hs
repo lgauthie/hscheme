@@ -143,7 +143,7 @@ parseBin :: Parser LispVal
 parseBin = do
     char 'b'
     s <- many1 $ oneOf "10"
-    return $ (Number . readBin) s
+    return $ Number . readBin $ s
 
 parseNumber :: Parser LispVal
 parseNumber = parseBin
@@ -160,8 +160,8 @@ parseReal = do
         return $ [con] ++ n
         <|> string ""
     return $ case rest of
-        '.':_     -> (Float . read) (num ++ rest)
-        '/':denom -> Rational (read num % read denom)
+        '.':_     -> Float . read $ num ++ rest
+        '/':denom -> Rational $ read num % read denom
         ""        -> Number $ read num
         _         -> error "Other cases aren't numbers!"
 
@@ -175,11 +175,11 @@ parseBareNumber = do
         return im
     return $ case c of
         Nothing -> real
-        Just im -> Complex (toDouble(real) :+ toDouble(im))
+        Just im -> Complex $ toDouble(real) :+ toDouble(im)
   where
     toDouble (Float x) = x
     toDouble (Number x) = fromIntegral x
-    toDouble (Rational x) = (fromIntegral (numerator x))/(fromIntegral (denominator x))
+    toDouble (Rational x) = fromIntegral (numerator x) / fromIntegral (denominator x)
     toDouble _ = error "toDouble only makes sense on numeric types"
 
 parseVector :: Parser LispVal

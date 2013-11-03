@@ -26,7 +26,26 @@ data LispVal
     | String String
     | Char Char
     | Bool Bool
-    deriving (Show)
+
+showVal :: LispVal -> String
+showVal val = case val of
+    (String contents) -> "\"" ++ contents ++ "\""
+    (Atom name)       -> name
+    (Number num)      -> show num
+    (Bool True)       -> "#t"
+    (Bool False)      -> "#f"
+    (List contents)   -> "(" ++ unwordsList contents ++ ")"
+    (DottedList h t)  -> "(" ++ unwordsList h ++ " . " ++ showVal t ++ ")"
+    (Vector contents) -> "#(" ++ unwordsList (Vec.toList contents) ++ ")"
+    (Float f)         -> show f
+    (Complex c)       -> show (realPart c) ++ "+" ++ show (imagPart c) ++ "i"
+    (Rational r)      -> show (numerator r) ++ "/" ++ show (denominator r)
+    (Char c)          -> "#\\" ++ [c]
+
+unwordsList :: [LispVal] -> String
+unwordsList = unwords . map showVal
+
+instance Show LispVal where show = showVal
 
 -- Match the lowercase or uppercase form of 'c'
 caseInsensitiveChar :: Char -> Parser Char

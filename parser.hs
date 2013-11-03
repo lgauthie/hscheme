@@ -32,7 +32,7 @@ caseInsensitiveChar c = char (toLower c) <|> char (toUpper c)
 
  -- Match the string 's', accepting either lowercase or uppercase form of each character
 caseInsensitiveString :: String -> Parser String
-caseInsensitiveString s = try (mapM caseInsensitiveChar s) <?> "\"" ++ s ++ "\""
+caseInsensitiveString s = mapM caseInsensitiveChar s <?> "\"" ++ s ++ "\""
 
 readBin :: String -> Integer
 readBin s = x
@@ -66,13 +66,20 @@ parseString = do
 parseChar :: Parser LispVal
 parseChar = do
     char '\\'
-    chars <- (try . caseInsensitiveString) "space"
-         <|> (try . caseInsensitiveString) "newline"
+    chars <- firstOrCaseInsensitiveString "space"
+         <|> firstOrCaseInsensitiveString "newline"
          <|> count 1 anyChar
-    return $ case (map toLower chars) of
-        [_] -> Char (head chars)
+    return $ case chars of
+        [ch] -> Char ch
         "space" -> Char ' '
         "newline" -> Char '\n'
+  where
+    firstOrCaseInsensitiveString (s:sx) = do
+        ch <- caseInsensitiveChar s
+        r <- optionMaybe $ caseInsensitiveString sx
+        return $ case r of
+            Nothing -> [ch]
+            Just t  -> [toLower s] ++ map toLower t
 
 parseAtom :: Parser LispVal
 parseAtom = do

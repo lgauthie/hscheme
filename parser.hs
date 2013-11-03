@@ -1,17 +1,17 @@
 module Main where
 
 --import Control.Monad (liftM)
-import Numeric (readInt, readOct, readHex)
-import Data.Complex
-import Data.Ratio
 import Data.Array
 import Data.Char (toLower, toUpper)
+import Data.Complex
+import Data.Ratio
+import Numeric (readInt, readOct, readHex)
 
-import Text.Parsec.String (Parser)
 import Text.Parsec hiding (spaces)
+import Text.Parsec.String (Parser)
 
-import qualified System.Environment as Sys
 import qualified Data.Char as Char
+import qualified System.Environment as Sys
 
 -- Data
 data LispVal

@@ -1,7 +1,6 @@
 module Main where
 
 --import Control.Monad (liftM)
-import Data.Array
 import Data.Char (toLower, toUpper)
 import Data.Complex
 import Data.Ratio
@@ -11,6 +10,7 @@ import Text.Parsec hiding (spaces)
 import Text.Parsec.String (Parser)
 
 import qualified Data.Char as Char
+import qualified Data.Vector as Vec
 import qualified System.Environment as Sys
 
 -- Data
@@ -18,7 +18,7 @@ data LispVal
     = Atom String
     | List [LispVal]
     | DottedList [LispVal] LispVal
-    | Vector (Array Integer LispVal)
+    | Vector (Vec.Vector LispVal)
     | Number Integer
     | Float Double
     | Complex (Complex Double)
@@ -163,9 +163,7 @@ parseVector = do
     char '('
     list <- sepBy parseExpr spaces
     char ')'
-    return $ Vector $ listArray (1,len(list)) list
-  where
-    len x = toInteger $ length x
+    return $ Vector $ Vec.fromList list
 
 parseLists :: Parser LispVal
 parseLists = do

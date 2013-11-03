@@ -72,10 +72,12 @@ parseChar = do
          <|> firstOrCaseInsensitiveString "newline"
          <|> count 1 anyChar
     return $ case chars of
-        [ch] -> Char ch
-        "space" -> Char ' '
+        [ch]      -> Char ch
+        "space"   -> Char ' '
         "newline" -> Char '\n'
+        _         -> error "Not a valid character literal"
   where
+    firstOrCaseInsensitiveString [] = error "Need at least one char to match"
     firstOrCaseInsensitiveString (s:sx) = do
         ch <- caseInsensitiveChar s
         r <- optionMaybe $ caseInsensitiveString sx
@@ -96,6 +98,7 @@ parseBool = do
     return $ case b of
         't' -> Bool True
         'f' -> Bool False
+        _   -> error "Only t and f are possible"
 
 parseHex :: Parser LispVal
 parseHex = do
@@ -141,6 +144,7 @@ parseReal = do
         '.':_     -> (Float . read) (num ++ rest)
         '/':denom -> Rational (read num % read denom)
         ""        -> Number $ read num
+        _         -> error "Other cases aren't numbers!"
 
 parseBareNumber :: Parser LispVal
 parseBareNumber = do
@@ -157,6 +161,7 @@ parseBareNumber = do
     toDouble (Float x) = x
     toDouble (Number x) = fromIntegral x
     toDouble (Rational x) = (fromIntegral (numerator x))/(fromIntegral (denominator x))
+    toDouble _ = error "toDouble only makes sense on numeric types"
 
 parseVector :: Parser LispVal
 parseVector = do
@@ -181,6 +186,7 @@ parseQuote = do
         '\'' -> List [Atom "quote", x]
         '`'  -> List [Atom "quasiquote", x]
         ','  -> List [Atom "unquote", x]
+        _    -> error "Only ['`,] are valid quote chars"
 
 parseExpr :: Parser LispVal
 parseExpr = parseAtom

@@ -156,6 +156,14 @@ parseBareNumber = do
     toDouble (Number x) = fromIntegral x
     toDouble (Rational x) = (fromIntegral (numerator x))/(fromIntegral (denominator x))
 
+parseLists :: Parser LispVal
+parseLists = do
+    listHead <- sepEndBy parseExpr spaces
+    listTail <- optionMaybe $ char '.' >> spaces >> parseExpr
+    return $ case listTail of
+        Nothing  -> List listHead
+        Just val -> DottedList listHead val
+
 parseQuote :: Parser LispVal
 parseQuote = do
     c <- oneOf "\'`,"
@@ -176,14 +184,6 @@ parseExpr = parseAtom
            x <- parseLists
            char ')'
            return x
-
-parseLists :: Parser LispVal
-parseLists = do
-    listHead <- sepEndBy parseExpr spaces
-    listTail <- optionMaybe $ char '.' >> spaces >> parseExpr
-    return $ case listTail of
-        Nothing  -> List listHead
-        Just val -> DottedList listHead val
 
 readExpr :: String -> String
 readExpr input = case parse parseExpr "lisp" input of

@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad (liftM)
+--import Control.Monad (liftM)
 import Numeric (readInt, readOct, readHex)
 import Data.Complex
 import Data.Ratio
@@ -163,18 +163,17 @@ parseExpr = parseAtom
     <|> do char '#'
            parseNumber <|> parseChar <|> parseBool
     <|> do char '('
-           x <- try parseList <|> parseDottedList
+           x <- parseLists
            char ')'
            return x
 
-parseList :: Parser LispVal
-parseList = liftM List $ sepBy parseExpr spaces
-
-parseDottedList :: Parser LispVal
-parseDottedList = do
-    listHead <- endBy parseExpr spaces
-    listTail <- char '.' >> spaces >> parseExpr
-    return $ DottedList listHead listTail
+parseLists :: Parser LispVal
+parseLists = do
+    listHead <- sepEndBy parseExpr spaces
+    listTail <- optionMaybe $ char '.' >> spaces >> parseExpr
+    return $ case listTail of
+        Nothing  -> List listHead
+        Just val -> DottedList listHead val
 
 parseQuoted :: Parser LispVal
 parseQuoted = do

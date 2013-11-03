@@ -42,10 +42,10 @@ showVal val = case val of
     (String contents) -> "\"" ++ contents ++ "\""
     (Vector contents) -> "#(" ++ unwordsList (Vec.toList contents) ++ ")"
 
+instance Show LispVal where show = showVal
+
 unwordsList :: [LispVal] -> String
 unwordsList = unwords . map showVal
-
-instance Show LispVal where show = showVal
 
 -- Match the lowercase or uppercase form of 'c'
 caseInsensitiveChar :: Char -> Parser Char

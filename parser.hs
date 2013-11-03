@@ -16,31 +16,31 @@ import qualified System.Environment as Sys
 -- Data
 data LispVal
     = Atom String
-    | List [LispVal]
-    | DottedList [LispVal] LispVal
-    | Vector (Vec.Vector LispVal)
-    | Number Integer
-    | Float Double
+    | Bool Bool
+    | Char Char
     | Complex (Complex Double)
+    | DottedList [LispVal] LispVal
+    | Float Double
+    | List [LispVal]
+    | Number Integer
     | Rational (Ratio Integer)
     | String String
-    | Char Char
-    | Bool Bool
+    | Vector (Vec.Vector LispVal)
 
 showVal :: LispVal -> String
 showVal val = case val of
-    (String contents) -> "\"" ++ contents ++ "\""
     (Atom name)       -> name
-    (Number num)      -> show num
-    (Bool True)       -> "#t"
     (Bool False)      -> "#f"
-    (List contents)   -> "(" ++ unwordsList contents ++ ")"
-    (DottedList h t)  -> "(" ++ unwordsList h ++ " . " ++ showVal t ++ ")"
-    (Vector contents) -> "#(" ++ unwordsList (Vec.toList contents) ++ ")"
-    (Float f)         -> show f
-    (Complex c)       -> show (realPart c) ++ "+" ++ show (imagPart c) ++ "i"
-    (Rational r)      -> show (numerator r) ++ "/" ++ show (denominator r)
+    (Bool True)       -> "#t"
     (Char c)          -> "#\\" ++ [c]
+    (Complex c)       -> show (realPart c) ++ "+" ++ show (imagPart c) ++ "i"
+    (DottedList h t)  -> "(" ++ unwordsList h ++ " . " ++ showVal t ++ ")"
+    (Float f)         -> show f
+    (List contents)   -> "(" ++ unwordsList contents ++ ")"
+    (Number num)      -> show num
+    (Rational r)      -> show (numerator r) ++ "/" ++ show (denominator r)
+    (String contents) -> "\"" ++ contents ++ "\""
+    (Vector contents) -> "#(" ++ unwordsList (Vec.toList contents) ++ ")"
 
 unwordsList :: [LispVal] -> String
 unwordsList = unwords . map showVal

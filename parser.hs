@@ -114,10 +114,9 @@ parseAtom = do
 parseBool :: Parser LispVal
 parseBool = do
     b <- char 't' <|> char 'f'
-    return $ case b of
-        't' -> Bool True
-        'f' -> Bool False
-        _   -> error "Only t and f are possible"
+    return $ if b == 't'
+                then Bool True
+                else Bool False
 
 parseHex :: Parser LispVal
 parseHex = do

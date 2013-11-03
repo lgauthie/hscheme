@@ -120,39 +120,39 @@ parseNumber = parseBin
           <|> parseHex
           <|> parseDec
 
-parseFloat :: Parser LispVal
-parseFloat = do
-    whole <- many1 $ digit
-    char '.'
-    dec <- many1 $ digit
-    return $ (Float . read) (whole++"."++dec)
+parseReal :: Parser LispVal
+parseReal = do
+    num <- many1 $ digit
+    rest <- do
+        con <- oneOf "/."
+        n <- many1 $ digit
+        return $ [con] ++ n
+        <|> string ""
+    return $ case rest of
+        '.':_     -> (Float . read) (num ++ rest)
+        '/':denom -> Rational (read num % read denom)
+        ""        -> Number $ read num
 
-parseComplex :: Parser LispVal
-parseComplex = do
-    real <- try parseFloat <|> parseDec
-    char '+'
-    im <- try parseFloat <|> parseDec
-    char 'i'
-    return $ Complex (toDouble(real) :+ toDouble(im))
+parseBareNumber :: Parser LispVal
+parseBareNumber = do
+    real <- parseReal
+    c <- optionMaybe $ do
+        char '+'
+        im <- parseReal
+        char 'i'
+        return im
+    return $ case c of
+        Nothing -> real
+        Just im -> Complex (toDouble(real) :+ toDouble(im))
   where
     toDouble (Float x) = x
     toDouble (Number x) = fromIntegral x
-
-parseRational :: Parser LispVal
-parseRational = do
-    numer <- parseDec
-    char '/'
-    denom <- parseDec
-    return $ Rational (toNum(numer) % toNum(denom))
-  where
-    toNum (Number x) = x
+    toDouble (Rational x) = (fromIntegral (numerator x))/(fromIntegral (denominator x))
 
 parseExpr :: Parser LispVal
 parseExpr = parseAtom
     <|> parseString
-    <|> try parseRational
-    <|> try parseComplex
-    <|> try parseFloat
+    <|> parseBareNumber
     <|> do char '#'
            parseNumber <|> parseChar <|> parseBool
     <|> do char '('

@@ -4,6 +4,7 @@ module Main where
 import Numeric (readInt, readOct, readHex)
 import Data.Complex
 import Data.Ratio
+import Data.Array
 import Data.Char (toLower, toUpper)
 
 import Text.Parsec.String (Parser)
@@ -17,6 +18,7 @@ data LispVal
     = Atom String
     | List [LispVal]
     | DottedList [LispVal] LispVal
+    | Vector (Array Integer LispVal)
     | Number Integer
     | Float Double
     | Complex (Complex Double)
@@ -156,6 +158,15 @@ parseBareNumber = do
     toDouble (Number x) = fromIntegral x
     toDouble (Rational x) = (fromIntegral (numerator x))/(fromIntegral (denominator x))
 
+parseVector :: Parser LispVal
+parseVector = do
+    char '('
+    list <- sepBy parseExpr spaces
+    char ')'
+    return $ Vector $ listArray (1,len(list)) list
+  where
+    len x = toInteger $ length x
+
 parseLists :: Parser LispVal
 parseLists = do
     listHead <- sepEndBy parseExpr spaces
@@ -179,7 +190,7 @@ parseExpr = parseAtom
     <|> parseString
     <|> parseBareNumber
     <|> do char '#'
-           parseNumber <|> parseChar <|> parseBool
+           parseNumber <|> parseChar <|> parseBool <|> parseVector
     <|> do char '('
            x <- parseLists
            char ')'

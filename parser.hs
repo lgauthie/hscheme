@@ -1,4 +1,4 @@
-module Main where
+module Parser where
 
 --import Control.Monad (liftM)
 import Data.Char (toLower, toUpper)
@@ -218,12 +218,12 @@ parseExpr = parseAtom
            char ')'
            return x
 
-readExpr :: String -> String
+readExpr :: String -> LispVal
 readExpr input = case parse parseExpr "lisp" input of
-    Left err -> "No Match: " ++ show err
-    Right val -> "Value Found: " ++ show val
+    Left err -> String $ "No Match: " ++ show err
+    Right val -> val
 
 main :: IO ()
 main = do
     args <- Sys.getArgs
-    putStrLn $ readExpr $ args !! 0
+    putStrLn $ show . readExpr $ args !! 0

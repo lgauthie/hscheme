@@ -8,7 +8,11 @@ import qualified System.Environment as Sys
 eval :: LispVal -> LispVal
 eval val@(String _) = val
 eval val@(Number _) = val
+eval val@(Float _) = val
+eval val@(Complex _) = val
+eval val@(Rational _) = val
 eval val@(Bool _) = val
+eval val@(Char _) = val
 eval (List [Atom "quote", val]) = val
 eval (List (Atom func : args)) = apply func $ map eval args
 

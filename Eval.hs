@@ -15,13 +15,15 @@ apply :: String -> [LispVal] -> LispVal
 apply func args = maybe (Bool False) ($ args) $ lookup func primitives
 
 primitives :: [(String, [LispVal] -> LispVal)]
-primitives = [("+", numericBinop (+)),
-              ("-", numericBinop (-)),
-              ("*", numericBinop (*)),
-              ("/", numericBinop div),
-              ("mod", numericBinop mod),
-              ("quotient", numericBinop quot),
-              ("remainder", numericBinop rem)]
+primitives =
+    [("+", numericBinop (+))
+    ,("-", numericBinop (-))
+    ,("*", numericBinop (*))
+    ,("/", numericBinop div)
+    ,("mod", numericBinop mod)
+    ,("quotient", numericBinop quot)
+    ,("remainder", numericBinop rem)
+    ]
 
 numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> LispVal
 numericBinop op params = Number $ foldl1 op $ map unpackNum params

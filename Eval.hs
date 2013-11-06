@@ -3,6 +3,7 @@ module Eval where
 import Parser (LispVal(..), readExpr)
 import Data.Data (toConstr)
 
+import qualified Data.Vector as Vec
 import qualified System.Environment as Sys
 
 eval :: LispVal -> LispVal
@@ -28,27 +29,27 @@ primitives =
     ,("mod", numericBinop mod)
     ,("quotient", numericBinop quot)
     ,("remainder", numericBinop rem)
-    ,("char?",     unaryOp Bool $ isA "Char")
-    ,("bool?",     unaryOp Bool $ isA "Bool")
-    ,("complex?",  unaryOp Bool $ isA "Complex")
-    ,("integer?",  unaryOp Bool $ isA "Number")
-    ,("list?",     unaryOp Bool $ isA "List")
+    ,("char?",     unaryOp Bool $ isA $ Char ' ')
+    ,("bool?",     unaryOp Bool $ isA $ Bool True)
+    ,("complex?",  unaryOp Bool $ isA $ Complex 0)
+    ,("integer?",  unaryOp Bool $ isA $ Number 0)
+    ,("list?",     unaryOp Bool $ isA $ List [])
     ,("number?",   unaryOp Bool isNumber)
-    ,("pair?",     unaryOp Bool $ isA "DottedList")
-    ,("rational?", unaryOp Bool $ isA "Rational")
+    ,("pair?",     unaryOp Bool $ isA $ DottedList [Char ' '] (Char ' '))
+    ,("rational?", unaryOp Bool $ isA $ Rational 0)
     ,("real?",     unaryOp Bool isReal)
-    ,("string?",   unaryOp Bool $ isA "String")
-    ,("vector?",   unaryOp Bool $ isA "Vector")
+    ,("string?",   unaryOp Bool $ isA $ String "")
+    ,("vector?",   unaryOp Bool $ isA $ Vector Vec.empty)
     ]
 
 isReal :: LispVal -> Bool
-isReal v = any (flip isA v) ["Number", "Rational", "Float"]
+isReal v = any (flip isA v) [Number 0, Rational 0, Float 0]
 
 isNumber :: LispVal -> Bool
-isNumber v = any (flip isA v) ["Number", "Rational", "Float", "Complex"]
+isNumber v = any (flip isA v) [Number 0, Complex 0, Float 0, Rational 0]
 
-isA :: String -> LispVal -> Bool
-isA s v = (show . toConstr $ v) == s
+isA :: LispVal -> LispVal -> Bool
+isA s v = toConstr v == toConstr s
 
 unaryOp :: (a -> LispVal) -- LispVal Type Constructor
       -> (LispVal -> a) -- The fn that will be used to evaluate the lispval

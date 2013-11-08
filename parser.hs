@@ -55,7 +55,7 @@ unwordsList = unwords . map showVal
 caseInsensitiveChar :: Char -> Parser Char
 caseInsensitiveChar c = char (toLower c) <|> char (toUpper c)
 
- -- Match the string 's', accepting either lowercase or uppercase form of each character
+ -- Match the string 's', accepting either lowercase or uppercase chars
 caseInsensitiveString :: String -> Parser String
 caseInsensitiveString s = mapM caseInsensitiveChar s <?> "\"" ++ s ++ "\""
 

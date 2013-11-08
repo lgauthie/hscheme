@@ -23,12 +23,12 @@ apply func args = maybe (Bool False) ($ args) $ lookup func primitives
 
 primitives :: [(String, [LispVal] -> LispVal)]
 primitives =
-    [("+", numericBinop (+))
-    ,("-", numericBinop (-))
-    ,("*", numericBinop (*))
-    ,("/", numericBinop div)
-    ,("mod", numericBinop mod)
-    ,("quotient", numericBinop quot)
+    [("+",         numericBinop (+))
+    ,("-",         numericBinop (-))
+    ,("*",         numericBinop (*))
+    ,("/",         numericBinop div)
+    ,("mod",       numericBinop mod)
+    ,("quotient",  numericBinop quot)
     ,("remainder", numericBinop rem)
     ,("char?",     unaryOp Bool $ isA $ Char ' ')
     ,("bool?",     unaryOp Bool $ isA $ Bool True)

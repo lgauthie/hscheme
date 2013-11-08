@@ -1,10 +1,44 @@
 module Eval where
 
-import Parser (LispVal(..), readExpr)
+import Parser (LispVal(..), readExpr, unwordsList, ParseError)
 import Data.Data (toConstr)
+import Control.Monad.Error
 
 import qualified Data.Vector as Vec
 import qualified System.Environment as Sys
+
+data LispError
+    = NumArgs Integer [LispVal]
+    | TypeMismatch String LispVal
+    | Parser ParseError
+    | BadSpecialForm String LispVal
+    | NotFunction String String
+    | UnboundVar String String
+    | Default String
+
+showError :: LispError -> String
+showError (NumArgs expected found) = "Expected " ++ show expected
+                                  ++ " args; Found Values" ++ unwordsList found
+showError (TypeMismatch expected found) = "Invalid Type: Expected " ++ expected
+                                       ++ ", Found " ++ show found
+showError (Parser parseErr) = "Parse Error At: " ++ show parseErr
+showError (BadSpecialForm message form) = message ++ ": " ++ show form
+showError (NotFunction message func) = message ++ ": " ++ func
+showError (UnboundVar message var) = message ++ ": " ++ var
+showError (Default message) = message
+
+instance Show LispError where show = showError
+instance Error LispError where
+    noMsg  = Default "An error has occured"
+    strMsg = Default
+
+type ThrowsError = Either LispError
+
+trapError :: (Show e, MonadError e m) => m String -> m String
+trapError action = catchError action (return . show)
+
+extractValue :: ThrowsError a -> a
+extractValue (Right val) = val
 
 eval :: LispVal -> LispVal
 eval val@(String _) = val

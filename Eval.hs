@@ -14,6 +14,7 @@ eval val@(Complex _) = val
 eval val@(Rational _) = val
 eval val@(Bool _) = val
 eval val@(Char _) = val
+eval val@(Atom _) = val
 eval (List [Atom "quote", val]) = val
 eval (List (Atom func : args)) = apply func $ map eval args
 
@@ -40,7 +41,22 @@ primitives =
     ,("real?",     unaryOp Bool isReal)
     ,("string?",   unaryOp Bool $ isA $ String "")
     ,("vector?",   unaryOp Bool $ isA $ Vector Vec.empty)
+    ,("symbol?",   isSymbol)
+    ,("symbol->string", symbolString)
+    ,("string->symbol", stringSymbol)
     ]
+
+symbolString :: [LispVal] -> LispVal
+symbolString [Atom atom] = String atom
+symbolString _ = Bool False
+
+stringSymbol :: [LispVal] -> LispVal
+stringSymbol [String s] = Atom s
+stringSymbol _ = Bool False
+
+isSymbol :: [LispVal] -> LispVal
+isSymbol [Atom _] = Bool True
+isSymbol _ = Bool False
 
 isReal :: LispVal -> Bool
 isReal v = any (flip isA v) [Number 0, Rational 0, Float 0]

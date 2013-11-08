@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module Parser where
+module Parser (LispVal(..) ,readExpr, ParseError, unwordsList, main) where
 
 --import Control.Monad (liftM)
 import Data.Char (toLower, toUpper)

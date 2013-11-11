@@ -18,7 +18,7 @@ data LispError
 
 showError :: LispError -> String
 showError (NumArgs expected found) = "Expected " ++ show expected
-                                  ++ " args; Found Values" ++ unwordsList found
+                                  ++ " args; Found Values " ++ unwordsList found
 showError (TypeMismatch expected found) = "Invalid Type: Expected " ++ expected
                                        ++ ", Found " ++ show found
 showError (Parser parseErr) = "Parse Error At: " ++ show parseErr

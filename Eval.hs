@@ -40,22 +40,24 @@ trapError action = catchError action (return . show)
 extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
 
-eval :: LispVal -> LispVal
-eval val@(String _) = val
-eval val@(Number _) = val
-eval val@(Float _) = val
-eval val@(Complex _) = val
-eval val@(Rational _) = val
-eval val@(Bool _) = val
-eval val@(Char _) = val
-eval val@(Atom _) = val
-eval (List [Atom "quote", val]) = val
-eval (List (Atom func : args)) = apply func $ map eval args
+eval :: LispVal -> ThrowsError LispVal
+eval val@(String _) = return val
+eval val@(Number _) = return val
+eval val@(Float _) = return val
+eval val@(Complex _) = return val
+eval val@(Rational _) = return val
+eval val@(Bool _) = return val
+eval val@(Char _) = return val
+eval val@(Atom _) = return val
+eval (List [Atom "quote", val]) = return val
+eval (List (Atom func : args)) = mapM eval args >>= apply func
 
-apply :: String -> [LispVal] -> LispVal
-apply func args = maybe (Bool False) ($ args) $ lookup func primitives
+apply :: String -> [LispVal] -> ThrowsError LispVal
+apply func args = maybe (throwError $ NotFunction "Unrecognized primitive function args" func)
+    ($ args)
+    (lookup func primitives)
 
-primitives :: [(String, [LispVal] -> LispVal)]
+primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
 primitives =
     [("+",         numericBinop (+))
     ,("-",         numericBinop (-))
@@ -80,17 +82,20 @@ primitives =
     ,("string->symbol", stringSymbol)
     ]
 
-symbolString :: [LispVal] -> LispVal
-symbolString [Atom atom] = String atom
-symbolString _ = Bool False
+symbolString :: [LispVal] -> ThrowsError LispVal
+symbolString [Atom atom] = return $ String atom
+symbolString [notAtom] = throwError $ TypeMismatch "symbol" notAtom
+symbolString vals = throwError $ NumArgs 1 vals
 
-stringSymbol :: [LispVal] -> LispVal
-stringSymbol [String s] = Atom s
-stringSymbol _ = Bool False
+stringSymbol :: [LispVal] -> ThrowsError LispVal
+stringSymbol [String s] = return $ Atom s
+stringSymbol [notStr] = throwError $ TypeMismatch "string" notStr
+stringSymbol vals = throwError $ NumArgs 1 vals
 
-isSymbol :: [LispVal] -> LispVal
-isSymbol [Atom _] = Bool True
-isSymbol _ = Bool False
+isSymbol :: [LispVal] -> ThrowsError LispVal
+isSymbol [Atom _] = return $ Bool True
+isSymbol [_] = return $ Bool False
+isSymbol vals = throwError $ NumArgs 1 vals
 
 isReal :: LispVal -> Bool
 isReal v = any (flip isA v) [Number 0, Rational 0, Float 0]
@@ -102,18 +107,28 @@ isA :: LispVal -> LispVal -> Bool
 isA s v = toConstr v == toConstr s
 
 unaryOp :: (a -> LispVal) -- LispVal Type Constructor
-      -> (LispVal -> a) -- The fn that will be used to evaluate the lispval
-      -> [LispVal]      -- A list of LispVals to evaluate
-      -> LispVal
-unaryOp t op [param] = t $ op param
-unaryOp _ _ _ = Bool False
+        -> (LispVal -> a) -- The fn that will be used to evaluate the lispval
+        -> [LispVal]      -- A list of LispVals to evaluate
+        -> ThrowsError LispVal
+unaryOp t op [param] = return $ t $ op param
+unaryOp _ _ vals = throwError $ NumArgs 1 vals
 
-numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> LispVal
-numericBinop op params = Number $ foldl1 op $ map unpackNum params
+numericBinop :: (Integer -> Integer -> Integer)
+             -> [LispVal]
+             -> ThrowsError LispVal
+numericBinop _     []  = throwError $ NumArgs 2 []
+numericBinop _ val@[_] = throwError $ NumArgs 2 val
+numericBinop op params = mapM unpackNum params >>= return . Number . foldl1 op
 
-unpackNum :: LispVal -> Integer
-unpackNum (Number n) = n
-unpackNum _ = 0
+unpackNum :: LispVal -> ThrowsError Integer
+unpackNum (Number n) = return n
+unpackNum (String n) =
+    let parsed = reads n in
+    if null parsed
+        then throwError $ TypeMismatch "number" $ String n
+        else return $ fst $ parsed !! 0
+unpackNum (List [n]) = unpackNum n
+unpackNum notNum = throwError $ TypeMismatch "number" notNum
 
 main :: IO ()
 main = Sys.getArgs >>= print . eval . readExpr . head

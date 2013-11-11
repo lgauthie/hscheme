@@ -2,9 +2,11 @@ module Eval where
 
 import Parser (LispVal(..), readExpr, unwordsList, ParseError)
 import Data.Data (toConstr)
+import Data.Map (Map)
 import Control.Monad.Error
 
 import qualified Data.Vector as Vec
+import qualified Data.Map as Map
 import qualified System.Environment as Sys
 
 data LispError
@@ -53,12 +55,12 @@ eval (List [Atom "quote", val]) = return val
 eval (List (Atom func : args)) = mapM eval args >>= apply func
 
 apply :: String -> [LispVal] -> ThrowsError LispVal
-apply func args = maybe (throwError $ NotFunction "Unrecognized primitive function args" func)
-    ($ args)
-    (lookup func primitives)
+apply func args = maybe err ($ args) $ Map.lookup func primitives
+  where
+    err = throwError $ NotFunction "Unrecognized primitive function" func
 
-primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
-primitives =
+primitives :: Map String ([LispVal] -> ThrowsError LispVal)
+primitives = Map.fromList
     [("+",         numericBinop (+))
     ,("-",         numericBinop (-))
     ,("*",         numericBinop (*))

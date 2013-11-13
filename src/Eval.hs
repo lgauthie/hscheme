@@ -103,6 +103,7 @@ primitives = Map.fromList
     ,("string->symbol", stringSymbol)
     ,("head", head')
     ,("tail", tail')
+    ,("cons", cons)
     ]
 
 head' :: [LispVal] -> ThrowsError LispVal
@@ -117,6 +118,13 @@ tail' [DottedList [_] x] = return x
 tail' [DottedList (_:xs) x] = return $ DottedList xs x
 tail' [badArg] = throwError $ TypeMismatch "pair" badArg
 tail' badArgList = throwError $ NumArgs 1 badArgList
+
+cons :: [LispVal] -> ThrowsError LispVal
+cons [x1, List []] = return $ List [x1]
+cons [x, List xs] = return $ List $ x : xs
+cons [x, DottedList xs xlast] = return $ DottedList (x : xs) xlast
+cons [x1, x2] = return $ DottedList [x1] x2
+cons badArgList = throwError $ NumArgs 2 badArgList
 
 unpackStr :: LispVal -> ThrowsError String
 unpackStr (String s) = return s

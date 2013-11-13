@@ -61,13 +61,13 @@ apply func args = maybe err ($ args) $ Map.lookup func primitives
 
 primitives :: Map String ([LispVal] -> ThrowsError LispVal)
 primitives = Map.fromList
-    [("+",         numericBinop (+))
-    ,("-",         numericBinop (-))
-    ,("*",         numericBinop (*))
-    ,("/",         numericBinop div)
-    ,("mod",       numericBinop mod)
-    ,("quotient",  numericBinop quot)
-    ,("remainder", numericBinop rem)
+    [("+",         binop unpackNum Number (+))
+    ,("-",         binop unpackNum Number (-))
+    ,("*",         binop unpackNum Number (*))
+    ,("/",         binop unpackNum Number div)
+    ,("mod",       binop unpackNum Number mod)
+    ,("quotient",  binop unpackNum Number quot)
+    ,("remainder", binop unpackNum Number rem)
     ,("char?",     unop Bool $ is $ Char ' ')
     ,("bool?",     unop Bool $ is $ Bool True)
     ,("complex?",  unop Bool $ is $ Complex 0)
@@ -109,12 +109,6 @@ isA :: LispVal -> LispVal -> Bool
 isA s v = toConstr v == toConstr s
 
 
-numericBinop :: (Integer -> Integer -> Integer)
-             -> [LispVal]
-             -> ThrowsError LispVal
-numericBinop _     []  = throwError $ NumArgs 2 []
-numericBinop _ val@[_] = throwError $ NumArgs 2 val
-numericBinop op params = mapM unpackNum params >>= return . Number . foldl1 op
 
 unpackNum :: LispVal -> ThrowsError Integer
 unpackNum (Number n) = return n
@@ -132,6 +126,15 @@ unop :: (a -> LispVal) -- LispVal Type Constructor
      -> ThrowsError LispVal
 unop t op [param] = return $ t $ op param
 unop _ _ vals = throwError $ NumArgs 1 vals
+
+binop :: (LispVal -> ThrowsError a) -- Unpacker
+      -> (a -> LispVal)             -- LispVal Type Constructor
+      -> (a -> a -> a)
+      -> [LispVal]
+      -> ThrowsError LispVal
+binop _ _ _     []  = throwError $ NumArgs 2 []
+binop _ _ _ val@[_] = throwError $ NumArgs 2 val
+binop unpacker t op params = mapM unpacker params >>= return . t . foldl1 op
 
 main :: IO ()
 main = Sys.getArgs >>= print . eval . readExpr . head

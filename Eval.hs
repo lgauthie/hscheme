@@ -68,17 +68,17 @@ primitives = Map.fromList
     ,("mod",       numericBinop mod)
     ,("quotient",  numericBinop quot)
     ,("remainder", numericBinop rem)
-    ,("char?",     unaryOp Bool $ isA $ Char ' ')
-    ,("bool?",     unaryOp Bool $ isA $ Bool True)
-    ,("complex?",  unaryOp Bool $ isA $ Complex 0)
-    ,("integer?",  unaryOp Bool $ isA $ Number 0)
-    ,("list?",     unaryOp Bool $ isA $ List [])
-    ,("number?",   unaryOp Bool isNumber)
-    ,("pair?",     unaryOp Bool $ isA $ DottedList [Char ' '] (Char ' '))
-    ,("rational?", unaryOp Bool $ isA $ Rational 0)
-    ,("real?",     unaryOp Bool isReal)
-    ,("string?",   unaryOp Bool $ isA $ String "")
-    ,("vector?",   unaryOp Bool $ isA $ Vector Vec.empty)
+    ,("char?",     unop Bool $ is $ Char ' ')
+    ,("bool?",     unop Bool $ is $ Bool True)
+    ,("complex?",  unop Bool $ is $ Complex 0)
+    ,("integer?",  unop Bool $ is $ Number 0)
+    ,("list?",     unop Bool $ is $ List [])
+    ,("number?",   unop Bool isNumber)
+    ,("pair?",     unop Bool $ is $ DottedList [Char ' '] (Char ' '))
+    ,("rational?", unop Bool $ is $ Rational 0)
+    ,("real?",     unop Bool isReal)
+    ,("string?",   unop Bool $ is $ String "")
+    ,("vector?",   unop Bool $ is $ Vector Vec.empty)
     ,("symbol?",   isSymbol)
     ,("symbol->string", symbolString)
     ,("string->symbol", stringSymbol)
@@ -108,12 +108,6 @@ isNumber v = any (flip isA v) [Number 0, Complex 0, Float 0, Rational 0]
 isA :: LispVal -> LispVal -> Bool
 isA s v = toConstr v == toConstr s
 
-unaryOp :: (a -> LispVal) -- LispVal Type Constructor
-        -> (LispVal -> a) -- The fn that will be used to evaluate the lispval
-        -> [LispVal]      -- A list of LispVals to evaluate
-        -> ThrowsError LispVal
-unaryOp t op [param] = return $ t $ op param
-unaryOp _ _ vals = throwError $ NumArgs 1 vals
 
 numericBinop :: (Integer -> Integer -> Integer)
              -> [LispVal]
@@ -131,6 +125,13 @@ unpackNum (String n) =
         else return $ fst $ parsed !! 0
 unpackNum (List [n]) = unpackNum n
 unpackNum notNum = throwError $ TypeMismatch "number" notNum
+
+unop :: (a -> LispVal) -- LispVal Type Constructor
+     -> (LispVal -> a) -- The fn that will be used to evaluate the lispval
+     -> [LispVal]      -- A list of LispVals to evaluate
+     -> ThrowsError LispVal
+unop t op [param] = return $ t $ op param
+unop _ _ vals = throwError $ NumArgs 1 vals
 
 main :: IO ()
 main = Sys.getArgs >>= print . eval . readExpr . head

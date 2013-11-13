@@ -1,6 +1,6 @@
 module Eval where
 
-import Parser (LispVal(..), readExpr, unwordsList, ParseError)
+import Parser (LispVal(..), ParseError, parse, parseExpr, unwordsList)
 import Data.Data (toConstr)
 import Data.Map (Map)
 import Control.Monad.Error
@@ -35,12 +35,6 @@ instance Error LispError where
     strMsg = Default
 
 type ThrowsError = Either LispError
-
-trapError :: (Show e, MonadError e m) => m String -> m String
-trapError action = catchError action (return . show)
-
-extractValue :: ThrowsError a -> a
-extractValue (Right val) = val
 
 eval :: LispVal -> ThrowsError LispVal
 eval val@(String _) = return val
@@ -204,5 +198,20 @@ boolBinop un bfn fn params = mapM unpacker (tupler params) >>=
         y1 <- un y
         return (x1, y1)
 
+readExpr :: String -> ThrowsError LispVal
+readExpr input = case parse parseExpr "lisp" input of
+    Left err -> throwError $ Parser err
+    Right val -> return val
+
+extractValue :: ThrowsError a -> a
+extractValue (Right val) = val
+extractValue _ = error "Can only extract Right val"
+
+trapError :: (Show e, MonadError e m) => m String -> m String
+trapError action = catchError action (return . show)
+
 main :: IO ()
-main = Sys.getArgs >>= print . eval . readExpr . head
+main = do
+    args <- Sys.getArgs
+    evaled <- return $ liftM show $ readExpr (args !! 0) >>= eval
+    putStrLn $ extractValue $ trapError evaled

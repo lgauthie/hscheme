@@ -56,7 +56,8 @@ eval (List [Atom "if", cond, conseq, alt]) =
     do result <- eval cond
        case result of
             Bool False -> eval alt
-            _          -> eval conseq
+            Bool True  -> eval conseq
+            notBool    -> throwError $ TypeMismatch "bool" notBool
 eval (List (Atom func : args)) = mapM eval args >>= apply func
 
 apply :: String -> [LispVal] -> ThrowsError LispVal

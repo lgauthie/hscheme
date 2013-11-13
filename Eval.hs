@@ -68,6 +68,19 @@ primitives = Map.fromList
     ,("mod",       binop unpackNum Number mod)
     ,("quotient",  binop unpackNum Number quot)
     ,("remainder", binop unpackNum Number rem)
+    ,("=",         boolBinop unpackNum and (==))
+    ,("<",         boolBinop unpackNum and (<))
+    ,(">",         boolBinop unpackNum and (>))
+    ,("/=",        boolBinop unpackNum and (/=))
+    ,(">=",        boolBinop unpackNum and (>=))
+    ,("<=",        boolBinop unpackNum and (<=))
+    ,("&&",        boolBinop unpackBool and (&&))
+    ,("||",        boolBinop unpackBool or (||))
+    ,("string=?",  boolBinop unpackStr and (==))
+    ,("string<?",  boolBinop unpackStr and (<))
+    ,("string>?",  boolBinop unpackStr and (>))
+    ,("string<=?", boolBinop unpackStr and (<=))
+    ,("string>=?", boolBinop unpackStr and (>=))
     ,("char?",     unop Bool $ is $ Char ' ')
     ,("bool?",     unop Bool $ is $ Bool True)
     ,("complex?",  unop Bool $ is $ Complex 0)
@@ -83,6 +96,26 @@ primitives = Map.fromList
     ,("symbol->string", symbolString)
     ,("string->symbol", stringSymbol)
     ]
+
+unpackStr :: LispVal -> ThrowsError String
+unpackStr (String s) = return s
+unpackStr (Number s) = return $ show s
+unpackStr (Bool s) = return $ show s
+unpackStr notString = throwError $ TypeMismatch "string" notString
+
+unpackBool :: LispVal -> ThrowsError Bool
+unpackBool (Bool b) = return b
+unpackBool notBool = throwError $ TypeMismatch "boolean" notBool
+
+unpackNum :: LispVal -> ThrowsError Integer
+unpackNum (Number n) = return n
+unpackNum (String n) =
+    let parsed = reads n in
+    if null parsed
+        then throwError $ TypeMismatch "number" $ String n
+        else return $ fst $ parsed !! 0
+unpackNum (List [n]) = unpackNum n
+unpackNum notNum = throwError $ TypeMismatch "number" notNum
 
 symbolString :: [LispVal] -> ThrowsError LispVal
 symbolString [Atom atom] = return $ String atom
@@ -100,25 +133,13 @@ isSymbol [_] = return $ Bool False
 isSymbol vals = throwError $ NumArgs 1 vals
 
 isReal :: LispVal -> Bool
-isReal v = any (flip isA v) [Number 0, Rational 0, Float 0]
+isReal v = any (flip is v) [Number 0, Rational 0, Float 0]
 
 isNumber :: LispVal -> Bool
-isNumber v = any (flip isA v) [Number 0, Complex 0, Float 0, Rational 0]
+isNumber v = any (flip is v) [Number 0, Complex 0, Float 0, Rational 0]
 
-isA :: LispVal -> LispVal -> Bool
-isA s v = toConstr v == toConstr s
-
-
-
-unpackNum :: LispVal -> ThrowsError Integer
-unpackNum (Number n) = return n
-unpackNum (String n) =
-    let parsed = reads n in
-    if null parsed
-        then throwError $ TypeMismatch "number" $ String n
-        else return $ fst $ parsed !! 0
-unpackNum (List [n]) = unpackNum n
-unpackNum notNum = throwError $ TypeMismatch "number" notNum
+is :: LispVal -> LispVal -> Bool
+is s v = toConstr v == toConstr s
 
 unop :: (a -> LispVal) -- LispVal Type Constructor
      -> (LispVal -> a) -- The fn that will be used to evaluate the lispval
@@ -135,6 +156,24 @@ binop :: (LispVal -> ThrowsError a) -- Unpacker
 binop _ _ _     []  = throwError $ NumArgs 2 []
 binop _ _ _ val@[_] = throwError $ NumArgs 2 val
 binop unpacker t op params = mapM unpacker params >>= return . t . foldl1 op
+
+boolBinop :: (LispVal -> ThrowsError a)
+          -> ([Bool] -> Bool)
+          -> (a -> a -> Bool)
+          -> [LispVal]
+          -> ThrowsError LispVal
+boolBinop _ _ _     []  = throwError $ NumArgs 2 []
+boolBinop _ _ _ val@[_] = throwError $ NumArgs 2 val
+boolBinop un bfn fn params = mapM unpacker (tupler params) >>=
+                         return . Bool . bfn . map (\(x,y) -> fn x y)
+  where
+    tupler [] = error "Can't Tuple empty list"
+    tupler [_] = []
+    tupler (x:y:ys) = (x, y):tupler(y:ys)
+    unpacker (x, y) = do
+        x1 <- un x
+        y1 <- un y
+        return (x1, y1)
 
 main :: IO ()
 main = Sys.getArgs >>= print . eval . readExpr . head

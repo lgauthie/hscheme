@@ -3,6 +3,8 @@ module Repl where
 import Control.Monad.Error
 import System.IO
 
+import qualified System.Console.Readline as R
+
 import Eval (extractValue, trapError, readExpr, eval)
 
 import qualified System.Environment as Sys
@@ -20,15 +22,15 @@ evalString :: String -> IO String
 evalString expr = return $ extractValue
                 $ trapError (liftM show $ readExpr expr >>= eval)
 
-until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
-until_ cond prompt action = do
-    result <- prompt
-    if cond result
-        then return ()
-        else action result >> until_ cond prompt action
-
 runRepl :: IO ()
-runRepl = until_ (== "quit") (readPrompt "Lisp>>> ") evalAndPrint
+runRepl = do
+    result <- R.readline "::> "
+    case result of
+        Just "exit" -> return ()
+        Just "quit" -> return ()
+        Just ":q" -> return ()
+        Just r      -> R.addHistory r >> evalAndPrint r >> runRepl
+        _           -> return ()
 
 main :: IO ()
 main = do args <- Sys.getArgs

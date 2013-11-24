@@ -102,6 +102,13 @@ defineVar envRef var value = do
           writeIORef envRef (Map.insert var valueRef env)
           return value
 
+bindVars :: Env -> [(String, LispVal)] -> IO Env
+bindVars envRef bindings = do
+    forM_ bindings $ \(key, val) -> do
+        valueRef <- newIORef val
+        env <- readIORef envRef
+        writeIORef envRef (Map.insert key valueRef env)
+    return envRef
 
 apply :: String -> [LispVal] -> ThrowsError LispVal
 apply func args = maybe err ($ args) $ Map.lookup func primitives

@@ -4,10 +4,15 @@ import Parser (LispVal(..), ParseError, parse, parseExpr, unwordsList)
 import Data.Data (toConstr)
 import Data.Map (Map)
 import Control.Monad.Error
+import Data.IORef
 
 import qualified Data.Vector as Vec
 import qualified Data.Map as Map
 import qualified System.Environment as Sys
+
+type Env = IORef (Map String (IORef LispVal))
+
+type IOThrowsError = ErrorT LispError IO
 
 data LispError
     = NumArgs Integer [LispVal]
@@ -36,23 +41,67 @@ instance Error LispError where
 
 type ThrowsError = Either LispError
 
-eval :: LispVal -> ThrowsError LispVal
-eval val@(String _) = return val
-eval val@(Number _) = return val
-eval val@(Float _) = return val
-eval val@(Complex _) = return val
-eval val@(Rational _) = return val
-eval val@(Bool _) = return val
-eval val@(Char _) = return val
-eval val@(Atom _) = return val
-eval (List [Atom "quote", val]) = return val
-eval (List [Atom "if", cond, conseq, alt]) =
-    do result <- eval cond
+eval :: Env -> LispVal -> IOThrowsError LispVal
+eval _   val@(String _) = return val
+eval _   val@(Number _) = return val
+eval _   val@(Float _) = return val
+eval _   val@(Complex _) = return val
+eval _   val@(Rational _) = return val
+eval _   val@(Bool _) = return val
+eval _   val@(Char _) = return val
+eval _   (List [Atom "quote", val]) = return val
+eval env (Atom name) = getVar env name
+eval env (List [Atom "if", cond, conseq, alt]) =
+    do result <- eval env cond
        case result of
-            Bool False -> eval alt
-            Bool True  -> eval conseq
+            Bool False -> eval env alt
+            Bool True  -> eval env conseq
             notBool    -> throwError $ TypeMismatch "bool" notBool
-eval (List (Atom func : args)) = mapM eval args >>= apply func
+eval env (List [Atom "set!", Atom var, form]) =
+    eval env form >>= setVar env var
+eval env (List [Atom "define", Atom var, form]) =
+    eval env form >>= defineVar env var
+eval env (List (Atom func : args)) = mapM (eval env) args >>= liftThrows . apply func
+
+nullEnv :: IO Env
+nullEnv = newIORef $ Map.fromList []
+
+liftThrows :: ThrowsError a -> IOThrowsError a
+liftThrows (Left err) = throwError err
+liftThrows (Right val) = return val
+
+runIOThrows :: IOThrowsError String -> IO String
+runIOThrows action = runErrorT (trapError action) >>= return . extractValue
+
+isBound :: Env -> String -> IO Bool
+isBound envRef var = readIORef envRef >>= return . maybe False (const True) . Map.lookup var
+
+getVar :: Env -> String -> IOThrowsError LispVal
+getVar envRef var  =  do
+    env <- liftIO $ readIORef envRef
+    maybe (throwError $ UnboundVar "Getting an unbound variable" var)
+        (liftIO . readIORef)
+        (Map.lookup var env)
+
+setVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+setVar envRef var value = do
+    env <- liftIO $ readIORef envRef
+    maybe (throwError $ UnboundVar "Setting an unbound variable" var)
+        (liftIO . (flip writeIORef value))
+        (Map.lookup var env)
+    return value
+
+defineVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+defineVar envRef var value = do
+    alreadyDefined <- liftIO $ isBound envRef var
+    if alreadyDefined
+       then setVar envRef var value >> return value
+       else liftIO $ do
+          valueRef <- newIORef value
+          env <- readIORef envRef
+          writeIORef envRef (Map.insert var valueRef env)
+          return value
+
 
 apply :: String -> [LispVal] -> ThrowsError LispVal
 apply func args = maybe err ($ args) $ Map.lookup func primitives
@@ -213,5 +262,7 @@ trapError action = catchError action (return . show)
 main :: IO ()
 main = do
     args <- Sys.getArgs
-    evaled <- return $ liftM show $ readExpr (args !! 0) >>= eval
-    putStrLn $ extractValue $ trapError evaled
+    let prog = args !! 0
+    env <- nullEnv
+    evaled <- runIOThrows $ liftM show $ (liftThrows $ readExpr prog) >>= eval env
+    putStrLn $ evaled

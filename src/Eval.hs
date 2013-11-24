@@ -236,8 +236,9 @@ boolBinop :: (LispVal -> ThrowsError a)
           -> ThrowsError LispVal
 boolBinop _ _ _     []  = throwError $ NumArgs 2 []
 boolBinop _ _ _ val@[_] = throwError $ NumArgs 2 val
-boolBinop un bfn fn params = mapM unpacker (tupler params) >>=
-                         return . Bool . bfn . map (\(x,y) -> fn x y)
+boolBinop un bfn fn params =
+    mapM unpacker (tupler params) >>=
+    return . Bool . bfn . map (\(x,y) -> fn x y)
   where
     tupler [] = error "Can't Tuple empty list"
     tupler [_] = []

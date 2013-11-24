@@ -81,15 +81,15 @@ getVar :: Env -> String -> IOThrowsError LispVal
 getVar envRef var  =  do
     env <- liftIO $ readIORef envRef
     maybe (throwError $ UnboundVar "Getting an unbound variable" var)
-        (liftIO . readIORef)
-        (Map.lookup var env)
+          (liftIO . readIORef)
+          (Map.lookup var env)
 
 setVar :: Env -> String -> LispVal -> IOThrowsError LispVal
 setVar envRef var value = do
     env <- liftIO $ readIORef envRef
     maybe (throwError $ UnboundVar "Setting an unbound variable" var)
-        (liftIO . (flip writeIORef value))
-        (Map.lookup var env)
+          (liftIO . (flip writeIORef value))
+          (Map.lookup var env)
     return value
 
 defineVar :: Env -> String -> LispVal -> IOThrowsError LispVal

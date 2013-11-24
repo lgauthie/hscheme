@@ -10,7 +10,8 @@ import qualified Data.Vector as Vec
 import qualified Data.Map as Map
 import qualified System.Environment as Sys
 
-type Env = IORef (Map String (IORef LispVal))
+type VarMap = Map String (IORef LispVal)
+type Env = IORef VarMap
 
 type IOThrowsError = ErrorT LispError IO
 

@@ -5,13 +5,7 @@ import System.IO
 
 import qualified System.Console.Readline as R
 
-import Eval (Env
-            ,readExpr
-            ,eval
-            ,runIOThrows
-            ,liftThrows
-            ,nullEnv
-            )
+import Eval (Env, readExpr, eval, runIOThrows, liftThrows, nullEnv)
 
 import qualified System.Environment as Sys
 

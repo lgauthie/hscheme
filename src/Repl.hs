@@ -39,7 +39,7 @@ runRepl envRef = do
         Just "quit" -> return ()
         Just ":q"   -> return ()
         Just r      -> R.addHistory r >> evalAndPrint envRef r >> runRepl envRef
-        _           -> return ()
+        _           -> runRepl envRef
 
 main :: IO ()
 main = do

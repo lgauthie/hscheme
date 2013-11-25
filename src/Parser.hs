@@ -1,12 +1,9 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Parser (LispVal(..), ParseError, parseExpr, unwordsList, parse, main) where
 
 --import Control.Monad (liftM)
 import Data.Char (toLower, toUpper)
 import Data.Complex
 import Data.Ratio
-import Data.Data (Data, Typeable)
 import Numeric (readInt, readOct, readHex)
 
 import Text.Parsec hiding (spaces)
@@ -29,7 +26,6 @@ data LispVal
     | Rational (Ratio Integer)
     | String String
     | Vector (Vec.Vector LispVal)
-    deriving (Data, Typeable)
 
 showVal :: LispVal -> String
 showVal val = case val of

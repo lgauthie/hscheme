@@ -1,12 +1,10 @@
 module Eval where
 
 import Parser (LispVal(..), ParseError, parse, parseExpr, unwordsList)
-import Data.Data (toConstr)
 import Data.Map (Map)
 import Control.Monad.Error
 import Data.IORef
 
-import qualified Data.Vector as Vec
 import qualified Data.Map as Map
 import qualified System.Environment as Sys
 
@@ -138,17 +136,17 @@ primitives = Map.fromList
     ,("string>?",  boolBinop unpackStr and (>))
     ,("string<=?", boolBinop unpackStr and (<=))
     ,("string>=?", boolBinop unpackStr and (>=))
-    ,("char?",     unop Bool $ is $ Char ' ')
-    ,("bool?",     unop Bool $ is $ Bool True)
-    ,("complex?",  unop Bool $ is $ Complex 0)
-    ,("integer?",  unop Bool $ is $ Number 0)
-    ,("list?",     unop Bool $ is $ List [])
-    ,("number?",   unop Bool isNumber)
-    ,("pair?",     unop Bool $ is $ DottedList [Char ' '] (Char ' '))
-    ,("rational?", unop Bool $ is $ Rational 0)
-    ,("real?",     unop Bool isReal)
-    ,("string?",   unop Bool $ is $ String "")
-    ,("vector?",   unop Bool $ is $ Vector Vec.empty)
+    ,("char?",     isChar)
+    ,("bool?",     isBool)
+    ,("complex?",  isComplex)
+    ,("integer?",  isNumber)
+    ,("list?",     isList)
+    ,("number?",   isNumber)
+    ,("pair?",     isDottedList)
+    ,("rational?", isRational)
+    ,("real?",     isReal)
+    ,("string?",   isString)
+    ,("vector?",   isVector)
     ,("symbol?",   isSymbol)
     ,("symbol->string", symbolString)
     ,("string->symbol", stringSymbol)
@@ -156,6 +154,53 @@ primitives = Map.fromList
     ,("tail", tail')
     ,("cons", cons)
     ]
+
+isSymbol :: [LispVal] -> ThrowsError LispVal
+isSymbol [Atom _] = return $ Bool True
+isSymbol [_] = return $ Bool False
+isSymbol vals = throwError $ NumArgs 1 vals
+
+isReal :: [LispVal] -> ThrowsError LispVal
+isReal [(Number _)]   = return $ Bool True
+isReal [(Rational _)] = return $ Bool True
+isReal [(Float _)]    = return $ Bool True
+isReal  _             = return $ Bool False
+
+isNumber :: [LispVal] -> ThrowsError LispVal
+isNumber [(Complex _)] = return $ Bool True
+isNumber  val          = isReal val
+
+isRational :: [LispVal] -> ThrowsError LispVal
+isRational [(Rational _)] = return $ Bool True
+isRational  _             = return $ Bool False
+
+isChar :: [LispVal] -> ThrowsError LispVal
+isChar [(Char _)] = return $ Bool True
+isChar  _         = return $ Bool False
+
+isString :: [LispVal] -> ThrowsError LispVal
+isString [(String _)] = return $ Bool True
+isString  _           = return $ Bool False
+
+isBool :: [LispVal] -> ThrowsError LispVal
+isBool [(Bool _)] = return $ Bool True
+isBool  _         = return $ Bool False
+
+isComplex :: [LispVal] -> ThrowsError LispVal
+isComplex [(Complex _)] = return $ Bool True
+isComplex  _            = return $ Bool False
+
+isList :: [LispVal] -> ThrowsError LispVal
+isList [(List _)] = return $ Bool True
+isList  _         = return $ Bool False
+
+isVector :: [LispVal] -> ThrowsError LispVal
+isVector [(Vector _)] = return $ Bool True
+isVector  _           = return $ Bool False
+
+isDottedList :: [LispVal] -> ThrowsError LispVal
+isDottedList [(DottedList _ _)] = return $ Bool True
+isDottedList  _                 = return $ Bool False
 
 head' :: [LispVal] -> ThrowsError LispVal
 head' [List (x:_)] = return x
@@ -206,20 +251,6 @@ stringSymbol :: [LispVal] -> ThrowsError LispVal
 stringSymbol [String s] = return $ Atom s
 stringSymbol [notStr] = throwError $ TypeMismatch "string" notStr
 stringSymbol vals = throwError $ NumArgs 1 vals
-
-isSymbol :: [LispVal] -> ThrowsError LispVal
-isSymbol [Atom _] = return $ Bool True
-isSymbol [_] = return $ Bool False
-isSymbol vals = throwError $ NumArgs 1 vals
-
-isReal :: LispVal -> Bool
-isReal v = any (flip is v) [Number 0, Rational 0, Float 0]
-
-isNumber :: LispVal -> Bool
-isNumber v = any (flip is v) [Number 0, Complex 0, Float 0, Rational 0]
-
-is :: LispVal -> LispVal -> Bool
-is s v = toConstr v == toConstr s
 
 unop :: (a -> LispVal) -- LispVal Type Constructor
      -> (LispVal -> a) -- The fn that will be used to evaluate the lispval

@@ -154,9 +154,9 @@ parseBareNumber = do
 
 parseVector :: Parser LispVal
 parseVector = do
-    char '('
+    char '['
     list <- sepBy parseExpr spaces
-    char ')'
+    char ']'
     return $ Vector $ V.fromList list
 
 parseLists :: Parser LispVal
@@ -182,8 +182,10 @@ parseExpr = parseAtom
     <|> parseQuote
     <|> parseString
     <|> parseBareNumber
+    <|> parseVector
+    <|> parseChar
     <|> do char '#'
-           parseNumber <|> parseChar <|> parseBool <|> parseVector
+           parseNumber <|> parseBool
     <|> do char '('
            x <- parseLists
            char ')'

@@ -81,7 +81,7 @@ showVal val = case val of
     (Number num)      -> show num
     (Rational r)      -> show (numerator r) ++ "/" ++ show (denominator r)
     (String contents) -> "\"" ++ contents ++ "\""
-    (Vector contents) -> "#(" ++ unwordsList (V.toList contents) ++ ")"
+    (Vector contents) -> "[" ++ unwordsList (V.toList contents) ++ "]"
     (PrimitiveFunc _) -> "<primitive>"
     (Func {params = args, vararg = varargs, body = _, closure = _}) ->
       "(lambda (" ++ unwords (map show args) ++

@@ -3,7 +3,6 @@ module Eval where
 import LispData
 
 import Parser (parse ,parseExpr)
-import Data.Map (Map)
 import Control.Monad.Error
 import Data.IORef (newIORef, readIORef, writeIORef)
 
@@ -28,11 +27,29 @@ eval env (List [Atom "if", cond, conseq, alt]) =
             Bool False -> eval env alt
             Bool True  -> eval env conseq
             notBool    -> throwError $ TypeMismatch "bool" notBool
-eval env (List [Atom "set!", Atom var, form]) =
-    eval env form >>= setVar env var
-eval env (List [Atom "define", Atom var, form]) =
-    eval env form >>= defineVar env var
-eval env (List (Atom func : args)) = mapM (eval env) args >>= liftThrows . apply func
+eval env (List [Atom "set!", Atom var, form]) = eval env form >>= setVar env var
+eval env (List [Atom "define", Atom var, form]) = eval env form >>= defineVar env var
+eval env (List (Atom "define" : List (Atom var : params') : body')) =
+    makeNormalFunc env params' body' >>= defineVar env var
+eval env (List (Atom "define" : DottedList (Atom var : params') varargs : body')) =
+    makeVarargs varargs env params' body' >>= defineVar env var
+eval env (List (Atom "lambda" : List params' : body')) = makeNormalFunc env params' body'
+eval env (List (Atom "lambda" : DottedList params' varargs : body')) =
+    makeVarargs varargs env params' body'
+eval env (List (Atom "lambda" : varargs@(Atom _) : body')) = makeVarargs varargs env [] body'
+eval env (List (function : args)) = do
+    func <- eval env function
+    argVals <- mapM (eval env) args
+    apply func argVals
+
+makeFunc :: Maybe String -> Env -> [LispVal] -> [LispVal] -> IOThrowsError LispVal
+makeFunc varargs' env params' body' = return $ Func (map show params') varargs' body' env
+
+makeNormalFunc :: Env -> [LispVal] -> [LispVal] -> IOThrowsError LispVal
+makeNormalFunc = makeFunc Nothing
+
+makeVarargs :: LispVal -> Env -> [LispVal] -> [LispVal] -> IOThrowsError LispVal
+makeVarargs = makeFunc . Just . show
 
 nullEnv :: IO Env
 nullEnv = newIORef $ M.fromList []
@@ -81,13 +98,31 @@ bindVars envRef bindings = do
         writeIORef envRef (M.insert key valueRef env)
     return envRef
 
-apply :: String -> [LispVal] -> ThrowsError LispVal
-apply func args = maybe err ($ args) $ M.lookup func primitives
+apply :: LispVal -> [LispVal] -> IOThrowsError LispVal
+apply (PrimitiveFunc fn) args = liftThrows $ fn args
+apply (Func p v b c) args =
+    if num p /= num args && v == Nothing
+       then throwError $ NumArgs (num p) args
+       else (liftIO $ bindVars c $ zip p args) >>= bindVarArgs v >>= evalBody
   where
-    err = throwError $ NotFunction "Unrecognized primitive function" func
+     remainingArgs = drop (length p) args
+     num = toInteger . length
+     evalBody env = liftM last $ mapM (eval env) b
+     bindVarArgs arg env = case arg of
+         Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
+         Nothing -> return env
 
-primitives :: Map String ([LispVal] -> ThrowsError LispVal)
-primitives = M.fromList
+primitiveBindings :: IO Env
+primitiveBindings = do
+    e <- nullEnv
+    forM_ primitives $ \(key, fn) -> do
+        valueRef <- newIORef $ PrimitiveFunc fn
+        env <- readIORef e
+        writeIORef e (M.insert key valueRef env)
+    return $ e
+
+primitives :: [(String, ([LispVal] -> ThrowsError LispVal))]
+primitives =
     [("+",         binop unpackNum Number (+))
     ,("-",         binop unpackNum Number (-))
     ,("*",         binop unpackNum Number (*))
@@ -275,6 +310,6 @@ main :: IO ()
 main = do
     args <- S.getArgs
     let prog = args !! 0
-    env <- nullEnv
+    env <- primitiveBindings
     evaled <- runIOThrows $ liftM show $ (liftThrows $ readExpr prog) >>= eval env
     putStrLn $ evaled

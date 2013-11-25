@@ -1,44 +1,16 @@
 module Eval where
 
-import Parser (LispVal(..), ParseError, parse, parseExpr, unwordsList)
+import LispData
+
+import Parser (parse ,parseExpr)
 import Data.Map (Map)
 import Control.Monad.Error
-import Data.IORef
+import Data.IORef (newIORef, readIORef, writeIORef)
 
-import qualified Data.Map as Map
-import qualified System.Environment as Sys
-
-type VarMap = Map String (IORef LispVal)
-type Env = IORef VarMap
+import qualified Data.Map as M
+import qualified System.Environment as S
 
 type IOThrowsError = ErrorT LispError IO
-
-data LispError
-    = NumArgs Integer [LispVal]
-    | TypeMismatch String LispVal
-    | Parser ParseError
-    | BadSpecialForm String LispVal
-    | NotFunction String String
-    | UnboundVar String String
-    | Default String
-
-showError :: LispError -> String
-showError (NumArgs expected found) = "Expected " ++ show expected
-                                  ++ " args; Found Values " ++ unwordsList found
-showError (TypeMismatch expected found) = "Invalid Type: Expected " ++ expected
-                                       ++ ", Found " ++ show found
-showError (Parser parseErr) = "Parse Error At: " ++ show parseErr
-showError (BadSpecialForm message form) = message ++ ": " ++ show form
-showError (NotFunction message func) = message ++ ": " ++ func
-showError (UnboundVar message var) = message ++ ": " ++ var
-showError (Default message) = message
-
-instance Show LispError where show = showError
-instance Error LispError where
-    noMsg  = Default "An error has occured"
-    strMsg = Default
-
-type ThrowsError = Either LispError
 
 eval :: Env -> LispVal -> IOThrowsError LispVal
 eval _   val@(String _) = return val
@@ -63,7 +35,7 @@ eval env (List [Atom "define", Atom var, form]) =
 eval env (List (Atom func : args)) = mapM (eval env) args >>= liftThrows . apply func
 
 nullEnv :: IO Env
-nullEnv = newIORef $ Map.fromList []
+nullEnv = newIORef $ M.fromList []
 
 liftThrows :: ThrowsError a -> IOThrowsError a
 liftThrows (Left err) = throwError err
@@ -73,21 +45,21 @@ runIOThrows :: IOThrowsError String -> IO String
 runIOThrows action = runErrorT (trapError action) >>= return . extractValue
 
 isBound :: Env -> String -> IO Bool
-isBound envRef var = readIORef envRef >>= return . maybe False (const True) . Map.lookup var
+isBound envRef var = readIORef envRef >>= return . maybe False (const True) . M.lookup var
 
 getVar :: Env -> String -> IOThrowsError LispVal
 getVar envRef var  =  do
     env <- liftIO $ readIORef envRef
     maybe (throwError $ UnboundVar "Getting an unbound variable" var)
           (liftIO . readIORef)
-          (Map.lookup var env)
+          (M.lookup var env)
 
 setVar :: Env -> String -> LispVal -> IOThrowsError LispVal
 setVar envRef var value = do
     env <- liftIO $ readIORef envRef
     maybe (throwError $ UnboundVar "Setting an unbound variable" var)
           (liftIO . (flip writeIORef value))
-          (Map.lookup var env)
+          (M.lookup var env)
     return value
 
 defineVar :: Env -> String -> LispVal -> IOThrowsError LispVal
@@ -98,7 +70,7 @@ defineVar envRef var value = do
        else liftIO $ do
           valueRef <- newIORef value
           env <- readIORef envRef
-          writeIORef envRef (Map.insert var valueRef env)
+          writeIORef envRef (M.insert var valueRef env)
           return value
 
 bindVars :: Env -> [(String, LispVal)] -> IO Env
@@ -106,16 +78,16 @@ bindVars envRef bindings = do
     forM_ bindings $ \(key, val) -> do
         valueRef <- newIORef val
         env <- readIORef envRef
-        writeIORef envRef (Map.insert key valueRef env)
+        writeIORef envRef (M.insert key valueRef env)
     return envRef
 
 apply :: String -> [LispVal] -> ThrowsError LispVal
-apply func args = maybe err ($ args) $ Map.lookup func primitives
+apply func args = maybe err ($ args) $ M.lookup func primitives
   where
     err = throwError $ NotFunction "Unrecognized primitive function" func
 
 primitives :: Map String ([LispVal] -> ThrowsError LispVal)
-primitives = Map.fromList
+primitives = M.fromList
     [("+",         binop unpackNum Number (+))
     ,("-",         binop unpackNum Number (-))
     ,("*",         binop unpackNum Number (*))
@@ -266,7 +238,7 @@ binop :: (LispVal -> ThrowsError a) -- Unpacker
       -> ThrowsError LispVal
 binop _ _ _     []  = throwError $ NumArgs 2 []
 binop _ _ _ val@[_] = throwError $ NumArgs 2 val
-binop unpacker t op params = mapM unpacker params >>= return . t . foldl1 op
+binop unpacker t op p = mapM unpacker p >>= return . t . foldl1 op
 
 boolBinop :: (LispVal -> ThrowsError a)
           -> ([Bool] -> Bool)
@@ -275,8 +247,8 @@ boolBinop :: (LispVal -> ThrowsError a)
           -> ThrowsError LispVal
 boolBinop _ _ _     []  = throwError $ NumArgs 2 []
 boolBinop _ _ _ val@[_] = throwError $ NumArgs 2 val
-boolBinop un bfn fn params =
-    mapM unpacker (tupler params) >>=
+boolBinop un bfn fn p =
+    mapM unpacker (tupler p) >>=
     return . Bool . bfn . map (\(x,y) -> fn x y)
   where
     tupler [] = error "Can't Tuple empty list"
@@ -301,7 +273,7 @@ trapError action = catchError action (return . show)
 
 main :: IO ()
 main = do
-    args <- Sys.getArgs
+    args <- S.getArgs
     let prog = args !! 0
     env <- nullEnv
     evaled <- runIOThrows $ liftM show $ (liftThrows $ readExpr prog) >>= eval env

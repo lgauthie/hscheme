@@ -1,13 +1,15 @@
 module Repl where
 
+import LispData
+
 import Control.Monad.Error
 import System.IO
 
 import qualified System.Console.Readline as R
 
-import Eval (Env, readExpr, eval, runIOThrows, liftThrows, nullEnv)
+import Eval (readExpr, eval, runIOThrows, liftThrows, nullEnv)
 
-import qualified System.Environment as Sys
+import qualified System.Environment as S
 
 flushStr :: String -> IO ()
 flushStr str = putStr str >> hFlush stdout
@@ -37,7 +39,7 @@ runRepl envRef = do
 
 main :: IO ()
 main = do
-    args <- Sys.getArgs
+    args <- S.getArgs
     case length args of
         0 -> nullEnv >>= runRepl
         1 -> runOne $ args !! 0

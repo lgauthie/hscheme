@@ -1,51 +1,22 @@
-module Parser (LispVal(..), ParseError, parseExpr, unwordsList, parse, main) where
+module Parser
+    (parseExpr
+    ,parse
+    ,main
+    ) where
 
---import Control.Monad (liftM)
+import LispData
+
 import Data.Char (toLower, toUpper)
-import Data.Complex
-import Data.Ratio
+import Data.Complex (Complex(..))
+import Data.Ratio ((%), numerator, denominator)
 import Numeric (readInt, readOct, readHex)
 
 import Text.Parsec hiding (spaces)
 import Text.Parsec.String (Parser)
 
-import qualified Data.Char as Char
-import qualified Data.Vector as Vec
-import qualified System.Environment as Sys
-
--- Data
-data LispVal
-    = Atom String
-    | Bool Bool
-    | Char Char
-    | Complex (Complex Double)
-    | DottedList [LispVal] LispVal
-    | Float Double
-    | List [LispVal]
-    | Number Integer
-    | Rational (Ratio Integer)
-    | String String
-    | Vector (Vec.Vector LispVal)
-
-showVal :: LispVal -> String
-showVal val = case val of
-    (Atom name)       -> name
-    (Bool False)      -> "#f"
-    (Bool True)       -> "#t"
-    (Char c)          -> "#\\" ++ [c]
-    (Complex c)       -> show (realPart c) ++ "+" ++ show (imagPart c) ++ "i"
-    (DottedList h t)  -> "(" ++ unwordsList h ++ " . " ++ showVal t ++ ")"
-    (Float f)         -> show f
-    (List contents)   -> "(" ++ unwordsList contents ++ ")"
-    (Number num)      -> show num
-    (Rational r)      -> show (numerator r) ++ "/" ++ show (denominator r)
-    (String contents) -> "\"" ++ contents ++ "\""
-    (Vector contents) -> "#(" ++ unwordsList (Vec.toList contents) ++ ")"
-
-instance Show LispVal where show = showVal
-
-unwordsList :: [LispVal] -> String
-unwordsList = unwords . map showVal
+import qualified Data.Char as C
+import qualified Data.Vector as V
+import qualified System.Environment as S
 
 -- Match the lowercase or uppercase form of 'c'
 caseInsensitiveChar :: Char -> Parser Char
@@ -57,7 +28,7 @@ caseInsensitiveString s = mapM caseInsensitiveChar s <?> "\"" ++ s ++ "\""
 
 readBin :: String -> Integer
 readBin s = x
-  where [(x,"")] = readInt 2 (`elem` "01") Char.digitToInt s
+  where [(x,"")] = readInt 2 (`elem` "01") C.digitToInt s
 
 -- Symbols
 symbol :: Parser Char
@@ -186,7 +157,7 @@ parseVector = do
     char '('
     list <- sepBy parseExpr spaces
     char ')'
-    return $ Vector $ Vec.fromList list
+    return $ Vector $ V.fromList list
 
 parseLists :: Parser LispVal
 parseLists = do
@@ -225,5 +196,5 @@ readExpr input = case parse parseExpr "lisp" input of
 
 main :: IO ()
 main = do
-    args <- Sys.getArgs
+    args <- S.getArgs
     putStrLn $ show . readExpr $ args !! 0

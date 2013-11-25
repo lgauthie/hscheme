@@ -7,15 +7,13 @@ module LispData
     ) where
 
 import Control.Monad.Error (Error, noMsg, strMsg)
-import Data.Complex (Complex)
+import Data.Complex (Complex, realPart, imagPart)
 import Data.IORef (IORef)
 import Data.Map (Map)
-import Data.Ratio (Ratio)
+import Data.Ratio (Ratio, numerator, denominator)
 import Data.Vector (Vector)
 import Text.Parsec (ParseError)
 
-import qualified Data.Complex as C
-import qualified Data.Ratio as R
 import qualified Data.Vector as V
 
 type VarMap = Map String (IORef LispVal)
@@ -76,13 +74,19 @@ showVal val = case val of
     (Bool False)      -> "#f"
     (Bool True)       -> "#t"
     (Char c)          -> "#\\" ++ [c]
-    (Complex c)       -> show (C.realPart c) ++ "+" ++ show (C.imagPart c) ++ "i"
+    (Complex c)       -> show (realPart c) ++ "+" ++ show (imagPart c) ++ "i"
     (DottedList h t)  -> "(" ++ unwordsList h ++ " . " ++ showVal t ++ ")"
     (Float f)         -> show f
     (List contents)   -> "(" ++ unwordsList contents ++ ")"
     (Number num)      -> show num
-    (Rational r)      -> show (R.numerator r) ++ "/" ++ show (R.denominator r)
+    (Rational r)      -> show (numerator r) ++ "/" ++ show (denominator r)
     (String contents) -> "\"" ++ contents ++ "\""
     (Vector contents) -> "#(" ++ unwordsList (V.toList contents) ++ ")"
+    (PrimitiveFunc _) -> "<primitive>"
+    (Func {params = args, vararg = varargs, body = _, closure = _}) ->
+      "(lambda (" ++ unwords (map show args) ++
+         (case varargs of
+            Nothing -> ""
+            Just arg -> " . " ++ arg) ++ ") ...)"
 
 instance Show LispVal where show = showVal

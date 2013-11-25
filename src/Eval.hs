@@ -20,6 +20,10 @@ eval _   val@(Rational _) = return val
 eval _   val@(Bool _) = return val
 eval _   val@(Char _) = return val
 eval _   val@(Vector _) = return val
+eval _   val@(DottedList _ _) = return val
+eval _   val@(PrimitiveFunc _) = return val
+eval _   val@(Func _ _ _ _) = return val
+eval _   val@(List []) = return val
 eval _   (List [Atom "quote", val]) = return val
 eval env (Atom name) = getVar env name
 eval env (List [Atom "if", cond, conseq, alt]) =
@@ -126,6 +130,7 @@ apply (Func p v b c) args =
      bindVarArgs arg env = case arg of
          Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
          Nothing -> return env
+apply val _ = throwError $ NotFunction "Trying to apply non function value" $ show val
 
 primitives :: [(String, ([LispVal] -> ThrowsError LispVal))]
 primitives =

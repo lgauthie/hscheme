@@ -57,6 +57,18 @@ makeVarargs = makeFunc . Just . show
 nullEnv :: IO Env
 nullEnv = newIORef $ M.fromList []
 
+primitiveBindings :: IO Env
+primitiveBindings = do
+    e <- nullEnv
+    forM_ primitives $ \(key, fn) -> do
+        valueRef <- newIORef $ PrimitiveFunc fn
+        env <- readIORef e
+        writeIORef e (M.insert key valueRef env)
+    return $ e
+
+trapError :: (Show e, MonadError e m) => m String -> m String
+trapError action = catchError action (return . show)
+
 liftThrows :: ThrowsError a -> IOThrowsError a
 liftThrows (Left err) = throwError err
 liftThrows (Right val) = return val
@@ -114,15 +126,6 @@ apply (Func p v b c) args =
      bindVarArgs arg env = case arg of
          Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
          Nothing -> return env
-
-primitiveBindings :: IO Env
-primitiveBindings = do
-    e <- nullEnv
-    forM_ primitives $ \(key, fn) -> do
-        valueRef <- newIORef $ PrimitiveFunc fn
-        env <- readIORef e
-        writeIORef e (M.insert key valueRef env)
-    return $ e
 
 primitives :: [(String, ([LispVal] -> ThrowsError LispVal))]
 primitives =
@@ -305,9 +308,6 @@ readExpr input = case parse parseExpr "lisp" input of
 extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
 extractValue _ = error "Can only extract Right val"
-
-trapError :: (Show e, MonadError e m) => m String -> m String
-trapError action = catchError action (return . show)
 
 main :: IO ()
 main = do

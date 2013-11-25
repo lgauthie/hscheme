@@ -19,6 +19,7 @@ eval _   val@(Complex _) = return val
 eval _   val@(Rational _) = return val
 eval _   val@(Bool _) = return val
 eval _   val@(Char _) = return val
+eval _   val@(Vector _) = return val
 eval _   (List [Atom "quote", val]) = return val
 eval env (Atom name) = getVar env name
 eval env (List [Atom "if", cond, conseq, alt]) =

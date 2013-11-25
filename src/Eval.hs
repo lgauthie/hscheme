@@ -4,6 +4,8 @@ import LispData
 
 import Parser (parse ,parseExpr)
 import Control.Monad.Error
+import Data.Complex (Complex)
+import Data.Ratio (Ratio)
 import Data.IORef (newIORef, readIORef, writeIORef)
 
 import qualified Data.Map as M
@@ -134,10 +136,10 @@ apply val _ = throwError $ NotFunction "Trying to apply non function value" $ sh
 
 primitives :: [(String, ([LispVal] -> ThrowsError LispVal))]
 primitives =
-    [("+",         binop unpackNum Number (+))
-    ,("-",         binop unpackNum Number (-))
-    ,("*",         binop unpackNum Number (*))
-    ,("/",         binop unpackNum Number div)
+    [("+",         plus)
+    ,("-",         minus)
+    ,("*",         mul)
+    ,("/",         div')
     ,("mod",       binop unpackNum Number mod)
     ,("quotient",  binop unpackNum Number quot)
     ,("remainder", binop unpackNum Number rem)
@@ -172,6 +174,38 @@ primitives =
     ,("tail", tail')
     ,("cons", cons)
     ]
+
+plus :: [LispVal] -> ThrowsError LispVal
+plus p@((Number _):_) = binop unpackNum Number (+) p
+plus p@((Float _):_) = binop unpackFloat Float (+) p
+plus p@((Complex _):_) = binop unpackComplex Complex (+) p
+plus p@((Rational _):_) = binop unpackRational Rational (+) p
+plus (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+plus [] = throwError $ NumArgs 2 []
+
+minus :: [LispVal] -> ThrowsError LispVal
+minus p@((Number _):_) = binop unpackNum Number (-) p
+minus p@((Float _):_) = binop unpackFloat Float (-) p
+minus p@((Complex _):_) = binop unpackComplex Complex (-) p
+minus p@((Rational _):_) = binop unpackRational Rational (-) p
+minus (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+minus [] = throwError $ NumArgs 2 []
+
+mul :: [LispVal] -> ThrowsError LispVal
+mul p@((Number _):_) = binop unpackNum Number (*) p
+mul p@((Float _):_) = binop unpackFloat Float (*) p
+mul p@((Complex _):_) = binop unpackComplex Complex (*) p
+mul p@((Rational _):_) = binop unpackRational Rational (*) p
+mul (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+mul [] = throwError $ NumArgs 2 []
+
+div' :: [LispVal] -> ThrowsError LispVal
+div' p@((Number _):_) = binop unpackNum Number div p
+div' p@((Float _):_) = binop unpackFloat Float (/) p
+div' p@((Complex _):_) = binop unpackComplex Complex (/) p
+div' p@((Rational _):_) = binop unpackRational Rational (/) p
+div' (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+div' [] = throwError $ NumArgs 2 []
 
 isSymbol :: [LispVal] -> ThrowsError LispVal
 isSymbol [Atom _] = return $ Bool True
@@ -259,6 +293,21 @@ unpackNum (String n) =
         else return $ fst $ parsed !! 0
 unpackNum (List [n]) = unpackNum n
 unpackNum notNum = throwError $ TypeMismatch "number" notNum
+
+unpackFloat :: LispVal -> ThrowsError Double
+unpackFloat (Float a) = return a
+unpackFloat (List [n]) = unpackFloat n
+unpackFloat notFloat = throwError $ TypeMismatch "float" notFloat
+
+unpackComplex :: LispVal -> ThrowsError (Complex Double)
+unpackComplex (Complex a) = return a
+unpackComplex (List [n]) = unpackComplex n
+unpackComplex notCmplx = throwError $ TypeMismatch "complex" notCmplx
+
+unpackRational :: LispVal -> ThrowsError (Ratio Integer)
+unpackRational (Rational a) = return a
+unpackRational (List [n]) = unpackRational n
+unpackRational notRa = throwError $ TypeMismatch "rational" notRa
 
 symbolString :: [LispVal] -> ThrowsError LispVal
 symbolString [Atom atom] = return $ String atom

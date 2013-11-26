@@ -9,7 +9,10 @@ import Data.Ratio (Ratio)
 import Data.IORef (newIORef, readIORef, writeIORef)
 
 import qualified Data.Map as M
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as VM
 import qualified System.Environment as S
+import qualified Control.Monad.ST as ST
 
 type IOThrowsError = ErrorT LispError IO
 
@@ -170,6 +173,9 @@ primitives =
     ,("symbol?",   isSymbol)
     ,("symbol->string", symbolString)
     ,("string->symbol", stringSymbol)
+    ,("vector-set!", vecSet)
+    ,("vector-ref",  vecRef)
+    ,("vector-len",  vecLen)
     ,("head", head')
     ,("tail", tail')
     ,("cons", cons)
@@ -291,6 +297,25 @@ isList  _         = return $ Bool False
 isVector :: [LispVal] -> ThrowsError LispVal
 isVector [(Vector _)] = return $ Bool True
 isVector  _           = return $ Bool False
+
+vecSet :: [LispVal] -> ThrowsError LispVal
+vecSet ((Vector v):(Number n):[val]) = return $ ST.runST $ do
+    vec <- V.thaw v
+    VM.write vec index val
+    V.freeze vec >>= return . Vector
+  where
+    index = fromIntegral n
+vecSet vals = throwError $ NumArgs 3 vals
+
+vecRef :: [LispVal] -> ThrowsError LispVal
+vecRef ((Vector v):[(Number n)]) = return $ v V.! index
+  where index = fromIntegral n
+vecRef vals = throwError $ NumArgs 2 vals
+
+vecLen :: [LispVal] -> ThrowsError LispVal
+vecLen [(Vector v)] = return $ Number len
+  where len = toInteger $ V.length v
+vecLen vals = throwError $ NumArgs 1 vals
 
 isDottedList :: [LispVal] -> ThrowsError LispVal
 isDottedList [(DottedList _ _)] = return $ Bool True

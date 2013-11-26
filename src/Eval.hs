@@ -299,12 +299,13 @@ isVector [(Vector _)] = return $ Bool True
 isVector  _           = return $ Bool False
 
 vecSet :: [LispVal] -> ThrowsError LispVal
-vecSet ((Vector v):(Number n):[val]) = return $ ST.runST $ do
-    vec <- V.thaw v
-    VM.write vec index val
-    V.freeze vec >>= return . Vector
-  where
-    index = fromIntegral n
+vecSet ((Vector v):(Number n):[val])
+    | V.length v < index = return $ ST.runST $ do
+        vec <- V.thaw v
+        VM.write vec index val
+        V.freeze vec >>= return . Vector
+    | otherwise = throwError $ Index "Index out of bounds" n
+  where index = fromIntegral n
 vecSet vals = throwError $ NumArgs 3 vals
 
 vecRef :: [LispVal] -> ThrowsError LispVal

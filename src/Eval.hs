@@ -143,12 +143,12 @@ primitives =
     ,("mod",       binop unpackNum Number mod)
     ,("quotient",  binop unpackNum Number quot)
     ,("remainder", binop unpackNum Number rem)
-    ,("=",         boolBinop unpackNum and (==))
-    ,("<",         boolBinop unpackNum and (<))
-    ,(">",         boolBinop unpackNum and (>))
-    ,("/=",        boolBinop unpackNum and (/=))
-    ,(">=",        boolBinop unpackNum and (>=))
-    ,("<=",        boolBinop unpackNum and (<=))
+    ,("=",         numEq)
+    ,("<",         numLt)
+    ,(">",         numGt)
+    ,("/=",        numNe)
+    ,(">=",        numGe)
+    ,("<=",        numLe)
     ,("&&",        boolBinop unpackBool and (&&))
     ,("||",        boolBinop unpackBool or (||))
     ,("string=?",  boolBinop unpackStr and (==))
@@ -206,6 +206,48 @@ div' p@((Complex _):_) = binop unpackComplex Complex (/) p
 div' p@((Rational _):_) = binop unpackRational Rational (/) p
 div' (notNum:_) = throwError $ TypeMismatch "numeric" notNum
 div' [] = throwError $ NumArgs 2 []
+
+numEq :: [LispVal] -> ThrowsError LispVal
+numEq p@((Number _):_) = boolBinop unpackNum and (==) p
+numEq p@((Float _):_) = boolBinop unpackFloat and (==) p
+numEq p@((Rational _):_) = boolBinop unpackRational and (==) p
+numEq (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+numEq [] = throwError $ NumArgs 2 []
+
+numNe :: [LispVal] -> ThrowsError LispVal
+numNe p@((Number _):_) = boolBinop unpackNum and (/=) p
+numNe p@((Float _):_) = boolBinop unpackFloat and (/=) p
+numNe p@((Rational _):_) = boolBinop unpackRational and (/=) p
+numNe (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+numNe [] = throwError $ NumArgs 2 []
+
+numGt :: [LispVal] -> ThrowsError LispVal
+numGt p@((Number _):_) = boolBinop unpackNum and (>) p
+numGt p@((Float _):_) = boolBinop unpackFloat and (>) p
+numGt p@((Rational _):_) = boolBinop unpackRational and (>) p
+numGt (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+numGt [] = throwError $ NumArgs 2 []
+
+numGe :: [LispVal] -> ThrowsError LispVal
+numGe p@((Number _):_) = boolBinop unpackNum and (>=) p
+numGe p@((Float _):_) = boolBinop unpackFloat and (>=) p
+numGe p@((Rational _):_) = boolBinop unpackRational and (>=) p
+numGe (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+numGe [] = throwError $ NumArgs 2 []
+
+numLt :: [LispVal] -> ThrowsError LispVal
+numLt p@((Number _):_) = boolBinop unpackNum and (<) p
+numLt p@((Float _):_) = boolBinop unpackFloat and (<) p
+numLt p@((Rational _):_) = boolBinop unpackRational and (<) p
+numLt (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+numLt [] = throwError $ NumArgs 2 []
+
+numLe :: [LispVal] -> ThrowsError LispVal
+numLe p@((Number _):_) = boolBinop unpackNum and (<=) p
+numLe p@((Float _):_) = boolBinop unpackFloat and (<=) p
+numLe p@((Rational _):_) = boolBinop unpackRational and (<=) p
+numLe (notNum:_) = throwError $ TypeMismatch "numeric" notNum
+numLe [] = throwError $ NumArgs 2 []
 
 isSymbol :: [LispVal] -> ThrowsError LispVal
 isSymbol [Atom _] = return $ Bool True

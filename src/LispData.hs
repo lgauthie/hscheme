@@ -28,6 +28,7 @@ data LispError
     | BadSpecialForm String LispVal
     | NotFunction String String
     | UnboundVar String String
+    | Index String Integer
     | Default String
 
 unwordsList :: [LispVal] -> String
@@ -42,6 +43,7 @@ showError (Parser parseErr) = "Parse Error At: " ++ show parseErr
 showError (BadSpecialForm message form) = message ++ ": " ++ show form
 showError (NotFunction message func) = message ++ ": " ++ func
 showError (UnboundVar message var) = message ++ ": " ++ var
+showError (Index message var) = message ++ ": " ++ show var
 showError (Default message) = message
 
 instance Show LispError where show = showError

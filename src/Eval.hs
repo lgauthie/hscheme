@@ -308,8 +308,10 @@ vecSet ((Vector v):(Number n):[val]) = return $ ST.runST $ do
 vecSet vals = throwError $ NumArgs 3 vals
 
 vecRef :: [LispVal] -> ThrowsError LispVal
-vecRef ((Vector v):[(Number n)]) = return $ v V.! index
-  where index = fromIntegral n
+vecRef ((Vector v):[(Number n)]) = maybe err return (v V.!? index)
+  where
+    index = fromIntegral n :: Int
+    err = throwError $ Index "Index out of bounds" n
 vecRef vals = throwError $ NumArgs 2 vals
 
 vecLen :: [LispVal] -> ThrowsError LispVal

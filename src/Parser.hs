@@ -1,7 +1,8 @@
 module Parser
     (parseExpr
     ,parse
-    ,main
+    ,readExpr
+    ,readExprList
     ) where
 
 import LispData
@@ -10,13 +11,13 @@ import Data.Char (toLower, toUpper)
 import Data.Complex (Complex(..))
 import Data.Ratio ((%), numerator, denominator)
 import Numeric (readInt, readOct, readHex)
+import Control.Monad.Error (throwError)
 
 import Text.Parsec hiding (spaces)
 import Text.Parsec.String (Parser)
 
 import qualified Data.Char as C
 import qualified Data.Vector as V
-import qualified System.Environment as S
 
 -- Match the lowercase or uppercase form of 'c'
 caseInsensitiveChar :: Char -> Parser Char
@@ -191,12 +192,13 @@ parseExpr = parseAtom
            char ')'
            return x
 
-readExpr :: String -> LispVal
-readExpr input = case parse parseExpr "lisp" input of
-    Left err -> String $ "No Match: " ++ show err
-    Right val -> val
+readExpr :: String -> ThrowsError LispVal
+readExpr = readOrThrow parseExpr
 
-main :: IO ()
-main = do
-    args <- S.getArgs
-    putStrLn $ show . readExpr $ args !! 0
+readExprList :: String -> ThrowsError [LispVal]
+readExprList = readOrThrow (endBy parseExpr spaces)
+
+readOrThrow :: Parser a -> String -> ThrowsError a
+readOrThrow parser input = case parse parser "lisp" input of
+    Left err -> throwError $ Parser err
+    Right val -> return val

@@ -2,19 +2,20 @@ module Eval where
 
 import LispData
 
-import Parser (parse ,parseExpr)
-import Control.Monad.Error
+import Parser (parse, parseExpr, readExprList)
 import Data.Complex (Complex)
 import Data.Ratio (Ratio)
 import Data.IORef (newIORef, readIORef, writeIORef)
+import Control.Monad.Error (MonadError, throwError, catchError, runErrorT)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad (forM_, liftM)
 
 import qualified Data.Map as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import qualified System.Environment as S
+import qualified System.IO as IO
 import qualified Control.Monad.ST as ST
-
-type IOThrowsError = ErrorT LispError IO
 
 eval :: Env -> LispVal -> IOThrowsError LispVal
 eval _   val@(String _) = return val
@@ -37,6 +38,8 @@ eval env (List [Atom "if", cond, conseq, alt]) =
             Bool False -> eval env alt
             Bool True  -> eval env conseq
             notBool    -> throwError $ TypeMismatch "bool" notBool
+eval env (List [Atom "load", String filename]) =
+    load filename >>= liftM last . mapM (eval env)
 eval env (List [Atom "set!", Atom var, form]) = eval env form >>= setVar env var
 eval env (List [Atom "define", Atom var, form]) = eval env form >>= defineVar env var
 eval env (List (Atom "define":List (Atom var:params'):body')) =
@@ -135,6 +138,7 @@ apply (Func p v b c) args =
      bindVarArgs arg env = case arg of
          Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
          Nothing -> return env
+apply (IOFunc func) args = func args
 apply val _ = throwError $ NotFunction "Trying to apply non function value" $ show val
 
 primitives :: [(String, ([LispVal] -> ThrowsError LispVal))]
@@ -180,6 +184,46 @@ primitives =
     ,("tail", tail')
     ,("cons", cons)
     ]
+
+ioPrimitives :: [(String, [LispVal] -> IOThrowsError LispVal)]
+ioPrimitives =
+    [("apply",             applyProc)
+    ,("open-input-file",   makePort IO.ReadMode)
+    ,("open-output-file",  makePort IO.WriteMode)
+    ,("close-port",        closePort)
+    ,("read",              readProc)
+    ,("write",             writeProc)
+    ,("read-contents",     readContents)
+    ,("read-all",          readAll)
+    ]
+
+applyProc :: [LispVal] -> IOThrowsError LispVal
+applyProc [func, List args] = apply func args
+applyProc (func : args) = apply func args
+
+makePort :: IO.IOMode -> [LispVal] -> IOThrowsError LispVal
+makePort mode [String filename] = liftM Port $ liftIO $ IO.openFile filename mode
+
+closePort :: [LispVal] -> IOThrowsError LispVal
+closePort [Port port] = liftIO $ IO.hClose port >> (return $ Bool True)
+closePort _           = return $ Bool False
+
+readProc :: [LispVal] -> IOThrowsError LispVal
+readProc [] = readProc [Port IO.stdin]
+readProc [Port port] = (liftIO $ IO.hGetLine port) >>= liftThrows . readExpr
+
+writeProc :: [LispVal] -> IOThrowsError LispVal
+writeProc [obj] = writeProc [obj, Port IO.stdout]
+writeProc [obj, Port port] = liftIO $ IO.hPrint port obj >> (return $ Bool True)
+
+readContents :: [LispVal] -> IOThrowsError LispVal
+readContents [String filename] = liftM String $ liftIO $ readFile filename
+
+load :: String -> IOThrowsError [LispVal]
+load filename = (liftIO $ readFile filename) >>= liftThrows . readExprList
+
+readAll :: [LispVal] -> IOThrowsError LispVal
+readAll [String filename] = liftM List $ load filename
 
 plus :: [LispVal] -> ThrowsError LispVal
 plus p@((Number _):_) = binop unpackNum Number (+) p

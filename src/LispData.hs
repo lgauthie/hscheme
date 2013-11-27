@@ -1,18 +1,20 @@
 module LispData
     (LispVal(..)
     ,LispError(..)
+    ,IOThrowsError
     ,ThrowsError
     ,VarMap
     ,Env
     ) where
 
-import Control.Monad.Error (Error, noMsg, strMsg)
+import Control.Monad.Error (ErrorT, Error, noMsg, strMsg)
 import Data.Complex (Complex, realPart, imagPart)
 import Data.IORef (IORef)
 import Data.Map (Map)
 import Data.Ratio (Ratio, numerator, denominator)
 import Data.Vector (Vector)
 import Text.Parsec (ParseError)
+import GHC.IO.Handle (Handle)
 
 import qualified Data.Vector as V
 
@@ -20,6 +22,7 @@ type VarMap = Map String (IORef LispVal)
 type Env = IORef VarMap
 
 type ThrowsError = Either LispError
+type IOThrowsError = ErrorT LispError IO
 
 data LispError
     = NumArgs Integer [LispVal]
@@ -64,6 +67,8 @@ data LispVal
     | String String
     | Vector (Vector LispVal)
     | PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
+    | IOFunc ([LispVal] -> IOThrowsError LispVal)
+    | Port Handle
     | Func {params :: [String]
            ,vararg :: (Maybe String)
            ,body :: [LispVal]
@@ -85,6 +90,8 @@ showVal val = case val of
     (String contents) -> "\"" ++ contents ++ "\""
     (Vector contents) -> "[" ++ unwordsList (V.toList contents) ++ "]"
     (PrimitiveFunc _) -> "<primitive>"
+    (IOFunc _)        -> "<io primitive>"
+    (Port _)          -> "<io port>"
     (Func {params = args, vararg = varargs, body = _, closure = _}) ->
       "(lambda (" ++ unwords (map show args) ++
          (case varargs of

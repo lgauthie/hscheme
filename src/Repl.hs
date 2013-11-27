@@ -7,7 +7,7 @@ import System.IO
 
 import qualified System.Console.Readline as R
 
-import Eval (readExpr, eval, runIOThrows, liftThrows, primitiveBindings)
+import Eval (readExpr, eval, runIOThrows, liftThrows, primitiveBindings, bindVars)
 
 import qualified System.Environment as S
 
@@ -24,8 +24,13 @@ evalString :: Env -> String -> IO String
 evalString env expr = runIOThrows $ liftM show $ (liftThrows $ readExpr expr)
                   >>= eval env
 
-runOne :: String -> IO ()
-runOne expr = primitiveBindings >>= flip evalAndPrint expr
+runOne :: [String] -> IO ()
+runOne args = do
+    env <- addArgs =<< primitiveBindings
+    (runIOThrows $ liftM show $ loadAndEval env) >>= hPutStrLn stderr
+  where
+    addArgs = flip bindVars [("args", List $ map String $ drop 1 args)]
+    loadAndEval env = eval env (List [Atom "load", String (args !! 0)])
 
 runRepl :: Env -> IO ()
 runRepl envRef = do
@@ -42,5 +47,5 @@ main = do
     args <- S.getArgs
     case length args of
         0 -> primitiveBindings >>= runRepl
-        1 -> runOne $ args !! 0
+        1 -> runOne $ args
         _ -> putStrLn "Program takes only 0 or 1 argument"

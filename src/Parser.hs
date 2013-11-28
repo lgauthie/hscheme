@@ -191,6 +191,10 @@ parseExpr = parseAtom
            x <- parseLists
            char ')'
            return x
+    <|> do char ';'
+           skipMany (noneOf "\n")
+           char '\n'
+           parseExpr
 
 readExpr :: String -> ThrowsError LispVal
 readExpr = readOrThrow parseExpr

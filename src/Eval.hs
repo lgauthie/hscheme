@@ -76,6 +76,10 @@ primitiveBindings = do
         valueRef <- newIORef $ PrimitiveFunc fn
         env <- readIORef e
         writeIORef e (M.insert key valueRef env)
+    forM_ ioPrimitives $ \(key, fn) -> do
+        valueRef <- newIORef $ IOFunc fn
+        env <- readIORef e
+        writeIORef e (M.insert key valueRef env)
     return $ e
 
 trapError :: (Show e, MonadError e m) => m String -> m String

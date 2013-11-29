@@ -34,6 +34,8 @@ eval _   val@(DottedList _ _) = return val
 eval _   val@(PrimitiveFunc _) = return val
 eval _   val@(Func _ _ _ _) = return val
 eval _   val@(List []) = return val
+eval _   val@(IOFunc _) = return . String $ show val
+eval _   val@(Port _) = return . String $ show val
 
 -- Eval quotes
 eval _   (List [Atom "quote", val]) = return val
@@ -200,9 +202,12 @@ ioPrimitives =
 applyProc :: [LispVal] -> IOThrowsError LispVal
 applyProc [func, List args] = apply func args
 applyProc (func : args) = apply func args
+applyProc [] =  throwError $ Default "Trying to apply function to no arguments"
 
 makePort :: IO.IOMode -> [LispVal] -> IOThrowsError LispVal
 makePort mode [String filename] = liftM Port $ liftIO $ IO.openFile filename mode
+makePort _ [val] = throwError $ TypeMismatch "string" val
+makePort _ vals = throwError $ NumArgs 1 vals
 
 closePort :: [LispVal] -> IOThrowsError LispVal
 closePort [Port port] = liftIO $ IO.hClose port >> (return $ Bool True)
@@ -211,19 +216,25 @@ closePort _           = return $ Bool False
 readProc :: [LispVal] -> IOThrowsError LispVal
 readProc [] = readProc [Port IO.stdin]
 readProc [Port port] = (liftIO $ IO.hGetLine port) >>= liftThrows . readExpr
+readProc [val] = throwError $ TypeMismatch "port" val
+readProc vals = throwError $ NumArgs 1 vals
 
 writeProc :: [LispVal] -> IOThrowsError LispVal
 writeProc [obj] = writeProc [obj, Port IO.stdout]
 writeProc [obj, Port port] = liftIO $ IO.hPrint port obj >> (return $ Bool True)
+writeProc _ = throwError $ Default "Error writing"
 
 readContents :: [LispVal] -> IOThrowsError LispVal
 readContents [String filename] = liftM String $ liftIO $ readFile filename
+readContents vals = throwError $ NumArgs 1 vals
 
 load :: String -> IOThrowsError [LispVal]
 load filename = (liftIO $ readFile filename) >>= liftThrows . readExprList
 
 readAll :: [LispVal] -> IOThrowsError LispVal
 readAll [String filename] = liftM List $ load filename
+readAll [val] = throwError $ TypeMismatch "string" val
+readAll vals = throwError $ NumArgs 1 vals
 
 primitives :: [(String, ([LispVal] -> ThrowsError LispVal))]
 primitives =

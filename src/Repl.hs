@@ -7,7 +7,8 @@ import System.IO
 
 import qualified System.Console.Readline as R
 
-import Eval (readExpr, eval, runIOThrows, liftThrows, primitiveBindings, bindVars)
+import Eval (eval, runIOThrows, liftThrows, primitiveBindings, bindVars)
+import Parser (readExpr)
 
 import qualified System.Environment as S
 

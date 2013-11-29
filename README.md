@@ -28,6 +28,26 @@ Notable differences from Scheme
   followed by standard list notation. This notation is also used in Clojure.
 - car and cdr have been replaced with head and tail.
 
+Installing
+==========
+
+Dependencies
+------------
+- A Haskell compiler
+    + tested with GHC, but uses no language extensions so should also compile
+      with Hugs.
+- libreadline
+    + This library should be available on most \*nix systems, and there exists
+      an installer for windows.
+
+Steps
+-----
+- `cd src`
+- `cabal install readline`
+- `make`
+
+If all goes well you are done!
+
 TODO
 ====
 

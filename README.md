@@ -1,5 +1,32 @@
 Hscheme
 =======
+A toy implementation of scheme written in Haskell for entertainment and
+learning purposes.
+
+The overall structure is based partially on the write yourself a scheme tutorial
+[here](http://en.wikibooks.org/wiki/Category:Write_Yourself_a_Scheme_in_48_Hours).
+Though the control flow of the program is similar, this implementation has a
+far richer feature set.
+
+Features
+--------
+- Fully non-backtracking recursive descent parser
+- Full parser support for all scheme types including a full numerical hierarchy
+- Full support for all numerical procedures
+- If conditionals
+- Support for Most scheme IO functionality
+- Lambdas, recursion, and closures
+- No type coercion, trying to add a float and an integer will raise a type
+  error
+- Probably many more I have forgotten!
+
+Notable differences from Scheme
+===============================
+- Chars are specified with only a leading back slash (`\c`) instead of (`#\c`)
+  Clojure uses this convention as well.
+- Vectors are specified using square brackets (`[` `]`) instead of a hash
+  followed by standard list notation. This notation is also used in Clojure.
+- car and cdr have been replaced with head and tail.
 
 TODO
 ====

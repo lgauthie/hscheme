@@ -179,7 +179,8 @@ parseQuote = do
         _    -> error "Only ['`,] are valid quote chars"
 
 parseExpr :: Parser LispVal
-parseExpr = parseAtom
+parseExpr
+      = parseAtom
     <|> parseQuote
     <|> parseString
     <|> parseBareNumber

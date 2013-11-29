@@ -18,8 +18,8 @@ import GHC.IO.Handle (Handle)
 
 import qualified Data.Vector as V
 
-type VarMap = Map String (IORef LispVal)
-type Env = IORef VarMap
+type VarMap = Map String (IORef LispVal) -- Map to hold functions and variables
+type Env = IORef VarMap  -- The Environment to be threaded through the execution
 
 type ThrowsError = Either LispError
 type IOThrowsError = ErrorT LispError IO
@@ -54,6 +54,7 @@ instance Error LispError where
     noMsg  = Default "An error has occured"
     strMsg = Default
 
+-- LispVals represent any possible type in the language
 data LispVal
     = Atom String
     | Bool Bool
@@ -75,6 +76,7 @@ data LispVal
            ,closure :: Env
            }
 
+-- Logic for displaying a value
 showVal :: LispVal -> String
 showVal val = case val of
     (Atom name)       -> name

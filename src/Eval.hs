@@ -2,7 +2,7 @@ module Eval where
 
 import LispData
 
-import Parser (parse, parseExpr, readExprList)
+import Parser (readExprList, readExpr)
 import Data.Complex (Complex)
 import Data.Ratio (Ratio)
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -17,7 +17,11 @@ import qualified System.Environment as S
 import qualified System.IO as IO
 import qualified Control.Monad.ST as ST
 
-eval :: Env -> LispVal -> IOThrowsError LispVal
+eval :: Env      -- The current envirionment
+     -> LispVal  -- The LispVal to be evaluated
+     -> IOThrowsError LispVal
+
+-- evals for language primitives just return the value
 eval _   val@(String _) = return val
 eval _   val@(Number _) = return val
 eval _   val@(Float _) = return val
@@ -30,28 +34,44 @@ eval _   val@(DottedList _ _) = return val
 eval _   val@(PrimitiveFunc _) = return val
 eval _   val@(Func _ _ _ _) = return val
 eval _   val@(List []) = return val
+
+-- Eval quotes
 eval _   (List [Atom "quote", val]) = return val
+
+-- Eval a varaible
 eval env (Atom name) = getVar env name
+
+-- Conditionals -- currently only if is implemented
 eval env (List [Atom "if", cond, conseq, alt]) =
     do result <- eval env cond
        case result of
             Bool False -> eval env alt
             Bool True  -> eval env conseq
             notBool    -> throwError $ TypeMismatch "bool" notBool
+
+-- Load a file into the current environment
 eval env (List [Atom "load", String filename]) =
     load filename >>= liftM last . mapM (eval env)
+
+-- Set/Define varaibles
 eval env (List [Atom "set!", Atom var, form]) = eval env form >>= setVar env var
 eval env (List [Atom "define", Atom var, form]) = eval env form >>= defineVar env var
+
+-- Define functions (works lists and dotted lists)
 eval env (List (Atom "define":List (Atom var:params'):body')) =
     makeNormalFunc env params' body' >>= defineVar env var
 eval env (List (Atom "define":DottedList (Atom var:params') varargs:body')) =
     makeVarargs varargs env params' body' >>= defineVar env var
+
+-- Make anonymous functions (works lists and dotted lists)
 eval env (List (Atom "lambda":List params':body')) =
     makeNormalFunc env params' body'
 eval env (List (Atom "lambda":DottedList params' varargs:body')) =
     makeVarargs varargs env params' body'
 eval env (List (Atom "lambda":varargs@(Atom _):body')) =
     makeVarargs varargs env [] body'
+
+-- Apply a function to a list of values
 eval env (List (function : args)) = do
     func <- eval env function
     argVals <- mapM (eval env) args
@@ -66,9 +86,12 @@ makeNormalFunc = makeFunc Nothing
 makeVarargs :: LispVal -> Env -> [LispVal] -> [LispVal] -> IOThrowsError LispVal
 makeVarargs = makeFunc . Just . show
 
+-- Creates a blank envirionment with no bound functions or varaibles
 nullEnv :: IO Env
 nullEnv = newIORef $ M.fromList []
 
+-- Used to generate the default environment with
+-- Primitive builtin functions, and IO functions
 primitiveBindings :: IO Env
 primitiveBindings = do
     e <- nullEnv
@@ -92,17 +115,27 @@ liftThrows (Right val) = return val
 runIOThrows :: IOThrowsError String -> IO String
 runIOThrows action = runErrorT (trapError action) >>= return . extractValue
 
-isBound :: Env -> String -> IO Bool
+-- Check if a name is bound for the current environment
+isBound :: Env    -- The current environment
+        -> String -- The varaible to check if bound
+        -> IO Bool
 isBound envRef var = readIORef envRef >>= return . maybe False (const True) . M.lookup var
 
-getVar :: Env -> String -> IOThrowsError LispVal
+-- Get the value of a bound varaible
+getVar :: Env     -- The current environment
+       -> String  -- The variable to get the value from
+       -> IOThrowsError LispVal
 getVar envRef var  =  do
     env <- liftIO $ readIORef envRef
     maybe (throwError $ UnboundVar "Getting an unbound variable" var)
           (liftIO . readIORef)
           (M.lookup var env)
 
-setVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+-- Set the value of a bound variable
+setVar :: Env      -- The current environment
+       -> String   -- Name of the variable to be set
+       -> LispVal  -- The value that variable will be set to
+       -> IOThrowsError LispVal
 setVar envRef var value = do
     env <- liftIO $ readIORef envRef
     maybe (throwError $ UnboundVar "Setting an unbound variable" var)
@@ -110,7 +143,11 @@ setVar envRef var value = do
           (M.lookup var env)
     return value
 
-defineVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+-- Define a single variable
+defineVar :: Env      -- The current environment
+          -> String   -- Name of the variable to be defined
+          -> LispVal  -- The value that varaible will be set to
+          -> IOThrowsError LispVal
 defineVar envRef var value = do
     alreadyDefined <- liftIO $ isBound envRef var
     if alreadyDefined
@@ -121,6 +158,7 @@ defineVar envRef var value = do
           writeIORef envRef (M.insert var valueRef env)
           return value
 
+-- Bind a bunch of variables at the same time
 bindVars :: Env -> [(String, LispVal)] -> IO Env
 bindVars envRef bindings = do
     forM_ bindings $ \(key, val) -> do
@@ -129,7 +167,9 @@ bindVars envRef bindings = do
         writeIORef envRef (M.insert key valueRef env)
     return envRef
 
-apply :: LispVal -> [LispVal] -> IOThrowsError LispVal
+apply :: LispVal   -- Lisp function to be applied
+      -> [LispVal] -- Values to apply the function to
+      -> IOThrowsError LispVal
 apply (PrimitiveFunc fn) args = liftThrows $ fn args
 apply (Func p v b c) args =
     if num p /= num args && v == Nothing
@@ -144,6 +184,46 @@ apply (Func p v b c) args =
          Nothing -> return env
 apply (IOFunc func) args = func args
 apply val _ = throwError $ NotFunction "Trying to apply non function value" $ show val
+
+ioPrimitives :: [(String, [LispVal] -> IOThrowsError LispVal)]
+ioPrimitives =
+    [("apply",             applyProc)
+    ,("open-input-file",   makePort IO.ReadMode)
+    ,("open-output-file",  makePort IO.WriteMode)
+    ,("close-port",        closePort)
+    ,("read",              readProc)
+    ,("write",             writeProc)
+    ,("read-contents",     readContents)
+    ,("read-all",          readAll)
+    ]
+
+applyProc :: [LispVal] -> IOThrowsError LispVal
+applyProc [func, List args] = apply func args
+applyProc (func : args) = apply func args
+
+makePort :: IO.IOMode -> [LispVal] -> IOThrowsError LispVal
+makePort mode [String filename] = liftM Port $ liftIO $ IO.openFile filename mode
+
+closePort :: [LispVal] -> IOThrowsError LispVal
+closePort [Port port] = liftIO $ IO.hClose port >> (return $ Bool True)
+closePort _           = return $ Bool False
+
+readProc :: [LispVal] -> IOThrowsError LispVal
+readProc [] = readProc [Port IO.stdin]
+readProc [Port port] = (liftIO $ IO.hGetLine port) >>= liftThrows . readExpr
+
+writeProc :: [LispVal] -> IOThrowsError LispVal
+writeProc [obj] = writeProc [obj, Port IO.stdout]
+writeProc [obj, Port port] = liftIO $ IO.hPrint port obj >> (return $ Bool True)
+
+readContents :: [LispVal] -> IOThrowsError LispVal
+readContents [String filename] = liftM String $ liftIO $ readFile filename
+
+load :: String -> IOThrowsError [LispVal]
+load filename = (liftIO $ readFile filename) >>= liftThrows . readExprList
+
+readAll :: [LispVal] -> IOThrowsError LispVal
+readAll [String filename] = liftM List $ load filename
 
 primitives :: [(String, ([LispVal] -> ThrowsError LispVal))]
 primitives =
@@ -188,46 +268,6 @@ primitives =
     ,("tail", tail')
     ,("cons", cons)
     ]
-
-ioPrimitives :: [(String, [LispVal] -> IOThrowsError LispVal)]
-ioPrimitives =
-    [("apply",             applyProc)
-    ,("open-input-file",   makePort IO.ReadMode)
-    ,("open-output-file",  makePort IO.WriteMode)
-    ,("close-port",        closePort)
-    ,("read",              readProc)
-    ,("write",             writeProc)
-    ,("read-contents",     readContents)
-    ,("read-all",          readAll)
-    ]
-
-applyProc :: [LispVal] -> IOThrowsError LispVal
-applyProc [func, List args] = apply func args
-applyProc (func : args) = apply func args
-
-makePort :: IO.IOMode -> [LispVal] -> IOThrowsError LispVal
-makePort mode [String filename] = liftM Port $ liftIO $ IO.openFile filename mode
-
-closePort :: [LispVal] -> IOThrowsError LispVal
-closePort [Port port] = liftIO $ IO.hClose port >> (return $ Bool True)
-closePort _           = return $ Bool False
-
-readProc :: [LispVal] -> IOThrowsError LispVal
-readProc [] = readProc [Port IO.stdin]
-readProc [Port port] = (liftIO $ IO.hGetLine port) >>= liftThrows . readExpr
-
-writeProc :: [LispVal] -> IOThrowsError LispVal
-writeProc [obj] = writeProc [obj, Port IO.stdout]
-writeProc [obj, Port port] = liftIO $ IO.hPrint port obj >> (return $ Bool True)
-
-readContents :: [LispVal] -> IOThrowsError LispVal
-readContents [String filename] = liftM String $ liftIO $ readFile filename
-
-load :: String -> IOThrowsError [LispVal]
-load filename = (liftIO $ readFile filename) >>= liftThrows . readExprList
-
-readAll :: [LispVal] -> IOThrowsError LispVal
-readAll [String filename] = liftM List $ load filename
 
 plus :: [LispVal] -> ThrowsError LispVal
 plus p@((Number _):_) = binop unpackNum Number (+) p
@@ -346,6 +386,7 @@ isVector :: [LispVal] -> ThrowsError LispVal
 isVector [(Vector _)] = return $ Bool True
 isVector  _           = return $ Bool False
 
+-- Set the value of index n to a new value
 vecSet :: [LispVal] -> ThrowsError LispVal
 vecSet ((Vector v):(Number n):[val])
     | V.length v < index = return $ ST.runST $ do
@@ -356,6 +397,7 @@ vecSet ((Vector v):(Number n):[val])
   where index = fromIntegral n
 vecSet vals = throwError $ NumArgs 3 vals
 
+-- Get the value at index n of a Lisp Vector
 vecRef :: [LispVal] -> ThrowsError LispVal
 vecRef ((Vector v):[(Number n)]) = maybe err return (v V.!? index)
   where
@@ -446,17 +488,17 @@ unop _ _ vals = throwError $ NumArgs 1 vals
 
 binop :: (LispVal -> ThrowsError a) -- Unpacker
       -> (a -> LispVal)             -- LispVal Type Constructor
-      -> (a -> a -> a)
-      -> [LispVal]
+      -> (a -> a -> a)              -- Binary op to apply to the list
+      -> [LispVal]                  -- List of LispVals to fold the op over
       -> ThrowsError LispVal
 binop _ _ _     []  = throwError $ NumArgs 2 []
 binop _ _ _ val@[_] = throwError $ NumArgs 2 val
 binop unpacker t op p = mapM unpacker p >>= return . t . foldl1 op
 
-boolBinop :: (LispVal -> ThrowsError a)
-          -> ([Bool] -> Bool)
-          -> (a -> a -> Bool)
-          -> [LispVal]
+boolBinop :: (LispVal -> ThrowsError a) -- LispVal Unpacking function
+          -> ([Bool] -> Bool)           -- fn to flatten a list of bools
+          -> (a -> a -> Bool)           -- the fn to map over the list
+          -> [LispVal]                  -- values to be bool'd
           -> ThrowsError LispVal
 boolBinop _ _ _     []  = throwError $ NumArgs 2 []
 boolBinop _ _ _ val@[_] = throwError $ NumArgs 2 val
@@ -464,19 +506,17 @@ boolBinop un bfn fn p =
     mapM unpacker (tupler p) >>=
     return . Bool . bfn . map (\(x,y) -> fn x y)
   where
+    -- Make pairs out of the input list
     tupler [] = error "Can't Tuple empty list"
     tupler [_] = []
     tupler (x:y:ys) = (x, y):tupler(y:ys)
+    -- Unpack LispVal tuples into a new tuple of vals
     unpacker (x, y) = do
         x1 <- un x
         y1 <- un y
         return (x1, y1)
 
-readExpr :: String -> ThrowsError LispVal
-readExpr input = case parse parseExpr "lisp" input of
-    Left err -> throwError $ Parser err
-    Right val -> return val
-
+-- Used to extract the value of an evaluated lisp expression
 extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
 extractValue _ = error "Can only extract Right val"

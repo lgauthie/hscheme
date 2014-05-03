@@ -36,9 +36,9 @@ symbol :: Parser Char
 symbol = oneOf "!$%&|*+-/:<=>?@^_~"
 
 escape :: Parser Char
-escape = do
-    char '\\'
-    c <- oneOf "\"\\nrt"
+escape =
+    char '\\' >>
+    oneOf "\"\\nrt" >>= \c ->
     return $ case c of
         'n' -> '\n'
         'r' -> '\r'
@@ -50,18 +50,18 @@ spaces = skipMany1 space
 
 -- Parsing Code
 parseString :: Parser LispVal
-parseString = do
-    char '"'
-    x <- many $ escape <|> noneOf "\""
-    char '"'
-    return $ String x
+parseString =
+    char '"' >>
+    many (escape <|> noneOf "\"") >>= \x ->
+    char '"' >>
+    return (String x)
 
 parseChar :: Parser LispVal
-parseChar = do
-    char '\\'
-    chars <- firstOrCaseInsensitiveString "space"
-         <|> firstOrCaseInsensitiveString "newline"
-         <|> count 1 anyChar
+parseChar =
+    char '\\' >>
+    (firstOrCaseInsensitiveString "space"
+     <|> firstOrCaseInsensitiveString "newline"
+     <|> count 1 anyChar) >>= \chars ->
     return $ case chars of
         [ch]      -> Char ch
         "space"   -> Char ' '
@@ -69,51 +69,48 @@ parseChar = do
         _         -> error "Not a valid character literal"
   where
     firstOrCaseInsensitiveString [] = error "Need at least one char to match"
-    firstOrCaseInsensitiveString (s:sx) = do
-        ch <- caseInsensitiveChar s
-        r <- optionMaybe $ caseInsensitiveString sx
+    firstOrCaseInsensitiveString (s:sx) =
+        caseInsensitiveChar s >>= \ch ->
+        optionMaybe (caseInsensitiveString sx) >>= \r ->
         return $ case r of
             Nothing -> [ch]
-            Just t  -> [toLower s] ++ map toLower t
+            Just t  -> toLower s:map toLower t
 
 parseAtom :: Parser LispVal
-parseAtom = do
-    first <- letter <|> symbol
-    rest <- many $ letter <|> digit <|> symbol
-    let atom = first:rest
-    return $ Atom atom
+parseAtom =
+    (letter <|> symbol) >>= \first ->
+    many (letter <|> digit <|> symbol) >>= \rest ->
+    return (Atom $ first:rest)
 
 parseBool :: Parser LispVal
-parseBool = do
-    b <- char 't' <|> char 'f'
-    return $ if b == 't'
-                then Bool True
-                else Bool False
+parseBool =
+    (char 't' <|> char 'f') >>= \b ->
+    return $ Bool $ b == 't'
 
 parseHex :: Parser LispVal
-parseHex = do
-    char 'x'
-    s <- many1 $ hexDigit
+parseHex =
+    char 'x' >>
+    many1 hexDigit >>= \s ->
     let [(n, "")] = readHex s
-    return $ Number n
+    in return (Number n)
 
 parseDec :: Parser LispVal
-parseDec = do
-    optional $ char 'd'
-    s <- many1 $ digit
+parseDec =
+    optional (char 'd') >>
+    many1 digit >>= \s ->
     return $ (Number . read) s
 
 parseOct :: Parser LispVal
-parseOct = do
-    char 'o'
-    s <- many1 $ octDigit
+parseOct =
+    char 'o' >>
+    many1 octDigit >>= \s ->
     let [(n, "")] = readOct s
-    return $ Number n
+    in return (Number n)
 
 parseBin :: Parser LispVal
-parseBin = do
-    char 'b'
-    s <- many1 $ oneOf "10"
+parseBin =
+    char 'b' >>
+    many1 (oneOf "10") >>= \s ->
     return $ Number . readBin $ s
 
 parseNumber :: Parser LispVal
@@ -123,13 +120,11 @@ parseNumber = parseBin
           <|> parseDec
 
 parseReal :: Parser LispVal
-parseReal = do
-    num <- many1 $ digit
-    rest <- do
-        con <- oneOf "/."
-        n <- many1 $ digit
-        return $ [con] ++ n
-        <|> string ""
+parseReal =
+    many1 digit >>= \num ->
+        (oneOf "/." >>= \con ->
+         many1 digit >>= \n ->
+         return (con:n) <|> string "") >>= \rest ->
     return $ case rest of
         '.':_     -> Float . read $ num ++ rest
         '/':denom -> Rational $ read num % read denom
@@ -137,16 +132,16 @@ parseReal = do
         _         -> error "Other cases aren't numbers!"
 
 parseBareNumber :: Parser LispVal
-parseBareNumber = do
-    real <- parseReal
-    c <- optionMaybe $ do
-        char '+'
-        im <- parseReal
-        char 'i'
-        return im
+parseBareNumber =
+    parseReal >>= \real ->
+    optionMaybe (
+        char '+' >>
+        parseReal >>= \im ->
+        char 'i' >>
+        return im) >>= \c ->
     return $ case c of
         Nothing -> real
-        Just im -> Complex $ toDouble(real) :+ toDouble(im)
+        Just im -> Complex $ toDouble real :+ toDouble im
   where
     toDouble (Float x) = x
     toDouble (Number x) = fromIntegral x
@@ -154,24 +149,24 @@ parseBareNumber = do
     toDouble _ = error "toDouble only makes sense on numeric types"
 
 parseVector :: Parser LispVal
-parseVector = do
-    char '['
-    list <- sepBy parseExpr spaces
-    char ']'
-    return $ Vector $ V.fromList list
+parseVector =
+    char '[' >>
+    sepBy parseExpr spaces >>= \list ->
+    char ']' >>
+    return (Vector $ V.fromList list)
 
 parseLists :: Parser LispVal
-parseLists = do
-    listHead <- sepEndBy parseExpr spaces
-    listTail <- optionMaybe $ char '.' >> spaces >> parseExpr
+parseLists =
+    sepEndBy parseExpr spaces >>= \listHead ->
+    optionMaybe (char '.' >> spaces >> parseExpr) >>= \listTail ->
     return $ case listTail of
         Nothing  -> List listHead
         Just val -> DottedList listHead val
 
 parseQuote :: Parser LispVal
-parseQuote = do
-    c <- oneOf "\'`,"
-    x <- parseExpr
+parseQuote =
+    oneOf "\'`," >>= \c ->
+    parseExpr >>= \x ->
     return $ case c of
         '\'' -> List [Atom "quote", x]
         '`'  -> List [Atom "quasiquote", x]
@@ -186,16 +181,15 @@ parseExpr
     <|> parseBareNumber
     <|> parseVector
     <|> parseChar
-    <|> do char '#'
-           parseNumber <|> parseBool
-    <|> do char '('
-           x <- parseLists
-           char ')'
-           return x
-    <|> do char ';'
-           skipMany (noneOf "\n")
-           char '\n'
-           parseExpr
+    <|> (char '#' >> (parseNumber <|> parseBool))
+    <|> (char '(' >>
+         parseLists >>= \x ->
+         char ')' >>
+         return x)
+    <|> (char ';' >>
+         skipMany (noneOf "\n") >>
+         char '\n' >>
+         parseExpr)
 
 readExpr :: String -> ThrowsError LispVal
 readExpr = readOrThrow parseExpr
